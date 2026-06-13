@@ -38,6 +38,8 @@ def test_alembic_upgrade_creates_schema_from_empty_sqlite(tmp_path, monkeypatch)
         "cellars",
         "locations",
         "label_image_uploads",
+        "import_batches",
+        "import_batch_rows",
     }.issubset(tables)
 
 
@@ -69,4 +71,4 @@ def test_alembic_upgrade_stamps_existing_alpha_sqlite_without_deleting_data(tmp_
         producer_count = connection.execute(text("SELECT COUNT(*) FROM producers")).scalar_one()
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
     assert producer_count == 1
-    assert version == "20260613_0001"
+    assert version == "20260613_0002"

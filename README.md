@@ -15,7 +15,7 @@
 
 `v0.4-local-alpha-demo`
 
-当前已建立本地 FastAPI 后端、SQLite + SQLAlchemy 数据模型、基础 CRUD API、库存 transaction workflow，以及 Vite + React + TypeScript 前端 Alpha Demo。前端已支持酒柜/位置管理、批量生成位置、手动入库、酒标图片本地上传与草稿确认入库、库存操作、藏酒搜索筛选、酒柜占用视图、Dashboard 适饮期洞察、CSV 导出和安全 CSV 导入草稿。AI/OCR 识别、价格 provider、云同步、账号系统尚未实现。
+当前已建立本地 FastAPI 后端、SQLite + SQLAlchemy 数据模型、Alembic 迁移、基础 CRUD API、库存 transaction workflow，以及 Vite + React + TypeScript 前端 Alpha Demo。前端已支持酒柜/位置管理、批量生成位置、手动入库、酒标图片本地上传与草稿确认入库、库存操作、藏酒搜索筛选、酒柜占用视图、Dashboard 适饮期洞察、CSV 导出、安全 CSV 导入草稿，以及 `WineList.xlsx` 的 `Stock` sheet 真实库存 dry-run/确认导入。AI/OCR 识别、价格 provider、云同步、账号系统尚未实现。
 
 ## MVP 产品边界
 
@@ -175,6 +175,28 @@ Frontend: http://127.0.0.1:5173
 http://127.0.0.1:8000/api/export/bottles.csv
 ```
 
+库存导入页面当前支持两条路径：
+
+- `WineList.xlsx` 真实库存导入：只读取 `Stock` sheet，解析阶段写入 import batch 审计草稿，但不创建 Producer/Wine/Vintage/Bottle/InventoryTransaction；确认阶段在单个数据库事务内通过 `IN` ledger 展开每瓶库存。
+- CSV 草稿导入：适合小批量或手工模板导入，确认前要求目标酒柜和位置已经存在。
+
+真实库存导入前，先在 `apps/api` 目录执行一次数据库备份：
+
+```powershell
+python scripts\backup_sqlite_db.py
+python -m alembic upgrade head
+```
+
+WineList 位置映射：
+
+| 来源字段 | 导入位置 |
+| --- | --- |
+| `Status=FR` | `法国朋友家 / FR` |
+| `CAVE=C` | `家中酒柜 / C` |
+| `Status` 和 `CAVE` 均为空 | `家中散放 / HOME-OUTSIDE` |
+
+`Stock.Quantity` 会展开为独立 Bottle；`Stock.Cost` 写入 `Bottle.purchase_price`，币种默认 `CNY`；`Stock.Channel` 写入 `purchase_channel`；`WS Price` 暂不导入估值。空 `Wine` 行会使用 `Producer` 作为酒款名并记录 warning。重复确认同一文件同一行会被阻止。
+
 CSV 当前支持导出和安全导入草稿。导入不会在解析阶段创建酒瓶或 transaction；只有用户确认全部有效行后，后端才会通过 `IN` ledger 规则创建库存。确认导入使用单个数据库事务：同一批次中任意一行在写入阶段失败时，整批都会 rollback，不会留下部分 bottle 或部分 transaction。
 
 导入 CSV 最小字段：
@@ -201,10 +223,19 @@ country,region,type,purchase_price,purchase_currency,purchase_date,purchase_sour
 4. `docs/04-data-model.md`
 5. `docs/10-codex-task-backlog.md`
 
-库存状态与 transaction 规则见 `docs/12-inventory-rules.md`。Alpha Demo 限制见 `docs/13-alpha-demo-limitations.md`。酒标 intake 与未来 AI/OCR adapter 边界见 `docs/14-label-intake-ai-adapter.md`。
+库存状态与 transaction 规则见 `docs/12-inventory-rules.md`。Alpha Demo 限制见 `docs/13-alpha-demo-limitations.md`。酒标 intake 与未来 AI/OCR adapter 边界见 `docs/14-label-intake-ai-adapter.md`。真实库存导入规则见 `docs/17-real-inventory-import.md`。
 
 当前本地 Alpha Demo 已建立。下一条可执行任务建议使用：
 
 ```text
-Read AGENTS.md and current docs. Refactor apps/web/src/App.tsx into focused page/components without changing behavior. Keep existing backend rules, label intake, CSV import/export, and alpha QA passing. Do not add AI integration, scraping, cloud sync, auth, payment, community, or recommendation engine.
+Read AGENTS.md, README.md, docs/progress.md, docs/open-issues.md, docs/roadmap.md, docs/12-inventory-rules.md, docs/16-database-migrations.md, docs/17-real-inventory-import.md.
+
+Goal:
+Design a safe import compensation workflow for WineList batches without deleting ledger history.
+
+Scope:
+- Use existing Import Batch Review as the source of created bottle ids and ledger transaction ids.
+- Propose how to compensate mistaken imported bottles through explicit ledger actions, not table deletes or transaction edits.
+- Do not import other Excel sheets, scrape prices, call external APIs, add auth/cloud, or mutate inventory outside InventoryService.
+- Keep backend pytest, frontend build/test, and qa:alpha passing.
 ```

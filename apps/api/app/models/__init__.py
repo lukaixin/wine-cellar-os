@@ -2,6 +2,7 @@ from app.models.base import Base
 from app.models.bottle import Bottle
 from app.models.cellar import Cellar
 from app.models.drink_window import DrinkWindow
+from app.models.import_batch import ImportBatch, ImportBatchRow
 from app.models.label_image import LabelImageUpload
 from app.models.location import Location
 from app.models.media import MediaAsset
@@ -17,6 +18,8 @@ __all__ = [
     "Bottle",
     "Cellar",
     "DrinkWindow",
+    "ImportBatch",
+    "ImportBatchRow",
     "InventoryTransaction",
     "LabelImageUpload",
     "Location",

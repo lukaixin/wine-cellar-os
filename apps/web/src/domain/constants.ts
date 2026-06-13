@@ -43,7 +43,7 @@ export function pageTitle(page: Page): string {
     bottles: "藏酒列表",
     detail: "酒瓶详情",
     add: "新增入库",
-    import: "CSV 导入",
+    import: "库存导入",
     label: "酒标入库",
     cellar: "酒柜地图",
     transactions: "Transaction",

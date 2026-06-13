@@ -5,6 +5,8 @@ import type {
   CsvImportDraft,
   CsvImportRow,
   DashboardSummary,
+  ImportBatchDetail,
+  ImportBatchListResponse,
   InventoryTransaction,
   LabelDraft,
   LabelDraftConfirmResult,
@@ -12,6 +14,8 @@ import type {
   Location,
   Producer,
   Vintage,
+  WineListImportConfirmResult,
+  WineListImportDraft,
   Wine,
 } from "./types";
 
@@ -88,6 +92,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ rows }),
     }),
+  createWineListImportDraft: (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<WineListImportDraft>("/api/import/winelist/draft", { method: "POST", body });
+  },
+  confirmWineListImport: (batchId: string) =>
+    request<WineListImportConfirmResult>(`/api/import/winelist/${batchId}/confirm`, { method: "POST" }),
+  importBatches: (limit = 50, offset = 0) =>
+    request<ImportBatchListResponse>(`/imports/batches?limit=${limit}&offset=${offset}`),
+  importBatch: (batchId: string) => request<ImportBatchDetail>(`/imports/batches/${batchId}`),
   uploadLabelImage: (file: File) => {
     const body = new FormData();
     body.append("file", file);

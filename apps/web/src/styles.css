@@ -635,6 +635,105 @@ img.label-preview {
   grid-column: 1 / -1;
 }
 
+.section-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.section-heading h2 {
+  margin: 0;
+}
+
+.status-pill {
+  background: #f1eee7;
+  border: 1px solid #ddd5c8;
+  border-radius: 6px;
+  color: #4e4a42;
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
+.compact-button {
+  min-height: 30px;
+  padding: 5px 10px;
+}
+
+.id-list,
+.raw-json {
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1.45;
+  max-width: 360px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.review-table {
+  min-width: 1240px;
+  table-layout: fixed;
+}
+
+.review-table th:nth-child(1),
+.review-table td:nth-child(1) {
+  width: 48px;
+}
+
+.review-table th:nth-child(2),
+.review-table td:nth-child(2) {
+  width: 300px;
+}
+
+.review-table th:nth-child(3),
+.review-table td:nth-child(3) {
+  width: 64px;
+}
+
+.review-table th:nth-child(4),
+.review-table td:nth-child(4) {
+  width: 260px;
+}
+
+.review-table th:nth-child(5),
+.review-table td:nth-child(5),
+.review-table th:nth-child(6),
+.review-table td:nth-child(6) {
+  width: 160px;
+}
+
+.review-table th:nth-child(7),
+.review-table td:nth-child(7),
+.review-table th:nth-child(8),
+.review-table td:nth-child(8) {
+  width: 140px;
+}
+
+.review-table td {
+  vertical-align: top;
+  white-space: normal;
+}
+
+.review-table .id-list,
+.review-table .raw-json {
+  background: #fbfaf6;
+  border: 1px solid #e3dccf;
+  border-radius: 6px;
+  box-sizing: border-box;
+  max-width: none;
+  overflow: auto;
+  padding: 6px;
+  width: 100%;
+}
+
+.review-table .raw-json {
+  max-height: 140px;
+}
+
+.review-table .id-list {
+  max-height: 110px;
+}
+
 .toolbar {
   display: flex;
   max-width: 360px;

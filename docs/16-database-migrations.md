@@ -18,6 +18,7 @@ Wine Cellar OS Alpha 默认使用本地 SQLite。随着字段和表继续增加�
 - `apps/api/alembic.ini`
 - `apps/api/migrations/env.py`
 - `apps/api/migrations/versions/20260613_0001_initial_alpha_schema.py`
+- `apps/api/migrations/versions/20260613_0002_import_batches.py`
 - `apps/api/scripts/backup_sqlite_db.py`
 
 ## 初始化或升级数据库
@@ -67,9 +68,11 @@ python -m alembic upgrade head
 - SQLite 上复杂 schema 变更需要单独评估，必要时使用 Alembic batch operations。
 - 新字段优先 nullable 或带安全 default，避免破坏已有行。
 - 库存状态仍必须以 `InventoryTransaction` 作为审计依据，migration 不应伪造库存事件。
+- 导入审计表可以记录来源和创建结果，但 migration 不应代替导入服务创建正式库存。
 
 ## 当前限制
 
 - 初始 baseline migration 主要用于创建空库，或给已有当前 Alpha schema 写入 Alembic 版本记录。
 - 如果用户手里的旧数据库 schema 已经偏离当前模型，baseline 不会自动补齐所有列级差异；需要先备份，再写专门的增量 migration。
 - FastAPI 启动仍保留当前本地开发的 `create_all` 行为；正式升级流程应使用 `python -m alembic upgrade head`。
+- `import_batches/import_batch_rows` 只记录导入批次审计，不提供自动撤销；撤销应另行设计 ledger 补偿流程。

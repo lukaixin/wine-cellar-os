@@ -4,15 +4,17 @@ export function DataTable({
   headers,
   rows,
   empty,
+  className,
 }: {
   headers: string[];
   rows: Array<{ key: string; cells: ReactNode[]; onClick?: () => void }>;
   empty: string;
+  className?: string;
 }) {
   if (!rows.length) return <div className="empty">{empty}</div>;
   return (
     <div className="table-wrap">
-      <table>
+      <table className={className}>
         <thead>
           <tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr>
         </thead>

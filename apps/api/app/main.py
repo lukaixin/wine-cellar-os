@@ -12,11 +12,13 @@ from app.routers import (
     dashboard,
     exports,
     imports,
+    import_batches,
     inventory_transactions,
     label_intake,
     locations,
     producers,
     vintages,
+    winelist_import,
     wines,
 )
 
@@ -46,6 +48,9 @@ app.include_router(inventory_transactions.router)
 app.include_router(dashboard.router)
 app.include_router(exports.router)
 app.include_router(imports.router)
+app.include_router(import_batches.router)
+app.include_router(import_batches.api_router)
+app.include_router(winelist_import.router)
 app.include_router(label_intake.router)
 
 

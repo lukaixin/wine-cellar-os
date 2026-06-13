@@ -108,6 +108,48 @@ function makeServer() {
     return transactionRead(transaction);
   }
 
+  const importBatchDetail = {
+    id: "batch-1",
+    filename: "WineList.xlsx",
+    sheet_name: "Stock",
+    file_sha256: "b".repeat(64),
+    status: "confirmed",
+    created_at: new Date(2026, 5, 13, 9, 0).toISOString(),
+    confirmed_at: new Date(2026, 5, 13, 9, 5).toISOString(),
+    total_rows: 114,
+    success_rows: 114,
+    warning_rows: 1,
+    error_rows: 1,
+    created_bottle_count: 119,
+    warnings: ["Region normalized from Sorthern Rhone to Southern Rhone"],
+    rows: [
+      {
+        row_number: 2,
+        raw_values: { Producer: "Sample Estate", Wine: "Sample Wine", Vintage: "2020", Quantity: "2" },
+        parsed_producer: "Sample Estate",
+        parsed_wine: "Sample Wine",
+        parsed_vintage: 2020,
+        quantity: 2,
+        warnings: ["Cost is blank; purchase_price will be null"],
+        errors: [],
+        created_bottle_ids: ["bottle-winelist-1", "bottle-winelist-2"],
+        ledger_transaction_ids: ["txn-winelist-1", "txn-winelist-2"],
+      },
+      {
+        row_number: 3,
+        raw_values: { Producer: "Broken Estate", Wine: "", Vintage: "bad", Quantity: "1" },
+        parsed_producer: null,
+        parsed_wine: null,
+        parsed_vintage: null,
+        quantity: null,
+        warnings: [],
+        errors: ["Vintage must be a year: bad"],
+        created_bottle_ids: [],
+        ledger_transaction_ids: [],
+      },
+    ],
+  };
+
   function dashboardSummary() {
     const inStock = state.bottles.filter((bottle) => bottle.current_status === "in_stock");
     const inStockReads = inStock.map(bottleRead);
@@ -197,6 +239,28 @@ function makeServer() {
     if (method === "GET" && url.pathname === "/api/locations") return json(state.locations.map(locationRead));
     if (method === "GET" && url.pathname === "/api/bottles") return json(state.bottles.map(bottleRead));
     if (method === "GET" && url.pathname === "/api/inventory-transactions") return json(state.transactions.map(transactionRead));
+    if (method === "GET" && url.pathname === "/imports/batches") {
+      return json({
+        total: 1,
+        limit: Number(url.searchParams.get("limit") ?? 50),
+        offset: Number(url.searchParams.get("offset") ?? 0),
+        items: [
+          {
+            id: importBatchDetail.id,
+            filename: importBatchDetail.filename,
+            status: importBatchDetail.status,
+            created_at: importBatchDetail.created_at,
+            confirmed_at: importBatchDetail.confirmed_at,
+            total_rows: importBatchDetail.total_rows,
+            success_rows: importBatchDetail.success_rows,
+            warning_rows: importBatchDetail.warning_rows,
+            error_rows: importBatchDetail.error_rows,
+            created_bottle_count: importBatchDetail.created_bottle_count,
+          },
+        ],
+      });
+    }
+    if (method === "GET" && url.pathname === "/imports/batches/batch-1") return json(importBatchDetail);
 
     if (method === "POST" && url.pathname === "/api/intake/label-images") {
       const uploadedFile = body instanceof FormData ? (body.get("file") as File | null) : null;
@@ -327,6 +391,79 @@ function makeServer() {
       });
     }
 
+    if (method === "POST" && url.pathname === "/api/import/winelist/draft") {
+      return json({
+        batch_id: "batch-1",
+        filename: "WineList.xlsx",
+        sheet_name: "Stock",
+        file_sha256: "b".repeat(64),
+        total_rows: 114,
+        valid_rows: 114,
+        invalid_rows: 0,
+        bottle_count: 119,
+        location_counts: {
+          "法国朋友家 / FR": 3,
+          "家中酒柜 / C": 86,
+          "家中散放 / HOME-OUTSIDE": 30,
+        },
+        registry_preview: {
+          producers_new: 80,
+          producers_existing: 0,
+          wines_new: 100,
+          wines_existing: 0,
+          vintages_new: 110,
+          vintages_existing: 0,
+        },
+        warnings: ["Region normalized from Sorthern Rhone to Southern Rhone"],
+        rows: [
+          {
+            id: "row-1",
+            row_number: 2,
+            status: "valid",
+            raw: { Producer: "Sample Estate", Wine: "Sample Wine", Vintage: "2020", Quantity: "2" },
+            normalized: {
+              country: "France",
+              region: "Southern Rhone",
+              appellation: "Cote Rotie",
+              producer_name: "Sample Estate",
+              wine_name: "Sample Wine",
+              type: "red",
+              vintage_year: 2020,
+              quantity: 2,
+              bottle_size_ml: 750,
+              purchase_price: "288.00",
+              purchase_currency: "CNY",
+              purchase_channel: "merchant",
+              purchase_source: "WineList.xlsx Stock",
+              cellar_name: "家中酒柜",
+              location_code: "C",
+              location_label: "家中酒柜 / C",
+              location_key: "CAVE_C",
+            },
+            errors: [],
+            warnings: [],
+            bottle_count: 2,
+          },
+        ],
+      });
+    }
+
+    if (method === "POST" && url.pathname === "/api/import/winelist/batch-1/confirm") {
+      return json({
+        batch_id: "batch-1",
+        created_bottles: 119,
+        created_bottle_ids: ["bottle-winelist-1"],
+        created_transaction_ids: ["txn-winelist-1"],
+        location_counts: {
+          "法国朋友家 / FR": 3,
+          "家中酒柜 / C": 86,
+          "家中散放 / HOME-OUTSIDE": 30,
+        },
+        transaction_type: "IN",
+        warnings: [],
+      }, 201);
+    }
+
     if (method === "POST" && url.pathname === "/api/cellars") {
       const cellar = { id: nextId("cellar"), ...body };
       state.cellars.push(cellar);
@@ -436,7 +573,24 @@ describe("Alpha UI smoke", () => {
     expect(await screen.findByText("还没有入库记录。")).toBeTruthy();
     expect(screen.getByRole("link", { name: "导出 CSV" }).getAttribute("href")).toContain("/api/export/bottles.csv");
 
-    await user.click(screen.getByRole("button", { name: "CSV 导入" }));
+    await user.click(screen.getByRole("button", { name: "库存导入" }));
+    const wineListFile = new File([new Uint8Array([1, 2, 3])], "WineList.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    await user.upload(screen.getByLabelText("WineList.xlsx 文件"), wineListFile);
+    await user.click(screen.getByRole("button", { name: "解析 WineList" }));
+    await screen.findByText("WineList dry-run 结果");
+    expect(screen.getByText("展开瓶数")).toBeTruthy();
+    expect(screen.getByText("法国朋友家 / FR")).toBeTruthy();
+    await screen.findByText("Import Batch History");
+    await user.click(screen.getAllByRole("button", { name: "查看" })[0]);
+    await screen.findByText("Import Batch Detail");
+    expect(screen.getAllByText("Region normalized from Sorthern Rhone to Southern Rhone").length).toBeGreaterThan(0);
+    expect(screen.getByText("Cost is blank; purchase_price will be null")).toBeTruthy();
+    expect(screen.getByText("Vintage must be a year: bad")).toBeTruthy();
+    expect(screen.getByText(/bottle-winelist-1/)).toBeTruthy();
+    expect(screen.getByText(/txn-winelist-1/)).toBeTruthy();
+
     const file = new File(
       [
         "producer_name,wine_name,vintage_year,bottle_size_ml,cellar_name,location_code\nImport Estate,Import Red,2020,750,QA柜,A-01-01",
@@ -447,7 +601,7 @@ describe("Alpha UI smoke", () => {
     await user.upload(screen.getByLabelText("CSV 文件"), file);
     await user.click(screen.getByRole("button", { name: "解析草稿" }));
     await screen.findByText(/wine_name is required/);
-    expect(screen.getByText("有效行")).toBeTruthy();
+    expect(screen.getAllByText("有效行").length).toBeGreaterThan(0);
     expect(screen.getByText("错误行")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "酒柜地图" }));

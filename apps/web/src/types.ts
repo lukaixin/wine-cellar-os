@@ -203,6 +203,123 @@ export type CsvImportConfirmResult = {
   warnings: string[];
 };
 
+export type WineListImportNormalizedRow = {
+  country: string;
+  region: string;
+  appellation: string;
+  producer_name: string;
+  wine_name: string;
+  type: string;
+  vintage_year: number;
+  quantity: number;
+  bottle_size_ml: number;
+  purchase_price?: string | null;
+  purchase_currency: string;
+  purchase_channel?: string | null;
+  purchase_source: string;
+  cellar_name: string;
+  location_code: string;
+  location_label: string;
+  location_key: string;
+  raw_status?: string | null;
+  raw_cave?: string | null;
+};
+
+export type WineListImportDraftRow = {
+  id?: string | null;
+  row_number: number;
+  status: "valid" | "invalid";
+  raw: Record<string, unknown>;
+  normalized?: WineListImportNormalizedRow | null;
+  errors: string[];
+  warnings: string[];
+  bottle_count: number;
+};
+
+export type WineListImportRegistryPreview = {
+  producers_new: number;
+  producers_existing: number;
+  wines_new: number;
+  wines_existing: number;
+  vintages_new: number;
+  vintages_existing: number;
+};
+
+export type WineListImportDraft = {
+  batch_id: string;
+  filename: string;
+  sheet_name: string;
+  file_sha256: string;
+  total_rows: number;
+  valid_rows: number;
+  invalid_rows: number;
+  bottle_count: number;
+  location_counts: Record<string, number>;
+  registry_preview: WineListImportRegistryPreview;
+  warnings: string[];
+  rows: WineListImportDraftRow[];
+};
+
+export type WineListImportConfirmResult = {
+  batch_id: string;
+  created_bottles: number;
+  created_bottle_ids: string[];
+  created_transaction_ids: string[];
+  location_counts: Record<string, number>;
+  transaction_type: "IN";
+  warnings: string[];
+};
+
+export type ImportBatchListItem = {
+  id: string;
+  filename: string;
+  status: string;
+  created_at: string;
+  confirmed_at?: string | null;
+  total_rows: number;
+  success_rows: number;
+  warning_rows: number;
+  error_rows: number;
+  created_bottle_count: number;
+};
+
+export type ImportBatchListResponse = {
+  total: number;
+  limit: number;
+  offset: number;
+  items: ImportBatchListItem[];
+};
+
+export type ImportBatchDetailRow = {
+  row_number: number;
+  raw_values: Record<string, unknown>;
+  parsed_producer?: string | null;
+  parsed_wine?: string | null;
+  parsed_vintage?: number | null;
+  quantity?: number | null;
+  warnings: string[];
+  errors: string[];
+  created_bottle_ids: string[];
+  ledger_transaction_ids: string[];
+};
+
+export type ImportBatchDetail = {
+  id: string;
+  filename: string;
+  sheet_name: string;
+  file_sha256: string;
+  status: string;
+  created_at: string;
+  confirmed_at?: string | null;
+  total_rows: number;
+  success_rows: number;
+  warning_rows: number;
+  error_rows: number;
+  created_bottle_count: number;
+  warnings: string[];
+  rows: ImportBatchDetailRow[];
+};
+
 export type LabelImageUpload = {
   id: string;
   original_filename: string;

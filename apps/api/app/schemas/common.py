@@ -394,6 +394,123 @@ class CsvImportConfirmResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class WineListImportNormalizedRow(BaseModel):
+    country: str
+    region: str
+    appellation: str
+    producer_name: str
+    wine_name: str
+    type: str
+    vintage_year: int
+    quantity: int
+    bottle_size_ml: int = 750
+    purchase_price: Decimal | None = None
+    purchase_currency: str = "CNY"
+    purchase_channel: str | None = None
+    purchase_source: str
+    cellar_name: str
+    location_code: str
+    location_label: str
+    location_key: str
+    raw_status: str | None = None
+    raw_cave: str | None = None
+
+
+class WineListImportDraftRow(BaseModel):
+    id: str | None = None
+    row_number: int
+    status: Literal["valid", "invalid"]
+    raw: dict[str, Any]
+    normalized: WineListImportNormalizedRow | None = None
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    bottle_count: int = 0
+
+
+class WineListImportRegistryPreview(BaseModel):
+    producers_new: int
+    producers_existing: int
+    wines_new: int
+    wines_existing: int
+    vintages_new: int
+    vintages_existing: int
+
+
+class WineListImportDraftResponse(BaseModel):
+    batch_id: str
+    filename: str
+    sheet_name: str = "Stock"
+    file_sha256: str
+    total_rows: int
+    valid_rows: int
+    invalid_rows: int
+    bottle_count: int
+    location_counts: dict[str, int]
+    registry_preview: WineListImportRegistryPreview
+    warnings: list[str] = Field(default_factory=list)
+    rows: list[WineListImportDraftRow]
+
+
+class WineListImportConfirmResponse(BaseModel):
+    batch_id: str
+    created_bottles: int
+    created_bottle_ids: list[str]
+    created_transaction_ids: list[str] = Field(default_factory=list)
+    location_counts: dict[str, int]
+    transaction_type: Literal["IN"] = "IN"
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ImportBatchListItem(BaseModel):
+    id: str
+    filename: str
+    status: str
+    created_at: datetime
+    confirmed_at: datetime | None = None
+    total_rows: int
+    success_rows: int
+    warning_rows: int
+    error_rows: int
+    created_bottle_count: int
+
+
+class ImportBatchListResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    items: list[ImportBatchListItem]
+
+
+class ImportBatchDetailRow(BaseModel):
+    row_number: int
+    raw_values: dict[str, Any]
+    parsed_producer: str | None = None
+    parsed_wine: str | None = None
+    parsed_vintage: int | None = None
+    quantity: int | None = None
+    warnings: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    created_bottle_ids: list[str] = Field(default_factory=list)
+    ledger_transaction_ids: list[str] = Field(default_factory=list)
+
+
+class ImportBatchDetailResponse(BaseModel):
+    id: str
+    filename: str
+    sheet_name: str
+    file_sha256: str
+    status: str
+    created_at: datetime
+    confirmed_at: datetime | None = None
+    total_rows: int
+    success_rows: int
+    warning_rows: int
+    error_rows: int
+    created_bottle_count: int
+    warnings: list[str] = Field(default_factory=list)
+    rows: list[ImportBatchDetailRow]
+
+
 class LabelImageUploadRead(OrmModel):
     id: str
     original_filename: str

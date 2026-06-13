@@ -2,6 +2,24 @@
 
 最后更新：2026-06-13
 
+## 2026-06-13 更新：WineList 真实库存导入
+
+- 新增 `WineList.xlsx` 的 `Stock` sheet 导入 workflow：draft 阶段只解析、校验并写入 import batch 审计记录，confirm 阶段才创建正式库存。
+- 新增 `import_batches` 和 `import_batch_rows` Alembic migration，用于保存来源文件、sheet、文件 hash、原始行、规范化行、warning/error、创建的 bottle id 和 transaction id。
+- WineList confirm 使用单个数据库事务，并通过 `InventoryService(..., commit=False)` 为每个展开后的 Bottle 生成 `IN` transaction；任意写入失败会整批 rollback。
+- `Stock.Quantity` 会展开为独立 Bottle；`Cost` 写入 `Bottle.purchase_price`，币种默认 `CNY`；`Channel` 写入 `purchase_channel`；`WS Price` 暂不导入估值。
+- 位置映射已固定为 `法国朋友家 / FR`、`家中酒柜 / C`、`家中散放 / HOME-OUTSIDE`。空 `Wine` 行按 `Producer` 同名酒款处理并记录 warning。
+- 前端“库存导入”页已新增 WineList Excel dry-run、位置汇总、registry 预览和确认入口，同时保留 CSV 草稿导入。
+- 新增 Import Batch Review：`GET /imports/batches` 和 `GET /imports/batches/{batch_id}` 支持查看批次列表、分页、行级 raw/parsed/warning/error，以及 created bottle ids 和 ledger transaction ids；前端同页展示 `Import Batch History` 和 `Import Batch Detail`。
+
+## 2026-06-13 更新：项目级 Codex skills 与样例画像脚本
+
+- 新增项目级 repo skills：`wine-registry-normalization`、`inventory-ledger-guard`、`sample-inventory-profiler`、`valuation-snapshot-design`、`migration-safety-review`、`alpha-qa-regression`，统一沉淀常见 Wine Cellar OS 工作流。
+- 所有 skills 均放在 `.agents/skills/` 下，明确了适用场景、非适用场景、必查约束和期望交付物，便于后续 Codex 任务直接复用。
+- 新增只读样例分析脚本 `scripts/profile_wine_sample.py`，可直接解析 `data/sample/WineList.xlsx` 的 sheet、列、空值、唯一值和基础分布，不依赖外部 API，也不改写样例文件。
+- 轻量验证已完成：六个 skill 均通过 `skill-creator` 的 `quick_validate.py`，`python -X utf8 scripts/profile_wine_sample.py` 已成功输出样例工作簿画像。
+- 本次变更未修改应用行为、数据库 schema、迁移文件或产品功能；未运行重测试。
+
 ## 2026-06-13 更新：CSV confirm 批量事务边界
 
 - CSV 导入确认改为单个数据库事务提交：批次内任意一行在写入阶段失败时，整批 rollback，不会留下部分 bottle 或部分 `IN` transaction。
@@ -27,7 +45,7 @@
 
 ## 当前项目状态
 
-当前处于本地 Alpha Demo 阶段。后端已具备 FastAPI + SQLite + SQLAlchemy 基础模型、CRUD API、库存 transaction workflow、Dashboard、CSV 导出、安全 CSV 导入草稿和批量事务确认工作流，以及本地酒标图片 intake 草稿工作流。前端已具备 React + Vite Alpha UI，覆盖 Dashboard、藏酒列表、酒瓶详情、手动入库、酒标入库、酒柜地图、Transaction 历史、CSV 导出和 CSV 导入草稿。
+当前处于本地 Alpha Demo 阶段。后端已具备 FastAPI + SQLite + SQLAlchemy 基础模型、Alembic migration、CRUD API、库存 transaction workflow、Dashboard、CSV 导出、安全 CSV 导入草稿、WineList Stock 真实库存导入和批量事务确认工作流，以及本地酒标图片 intake 草稿工作流。前端已具备 React + Vite Alpha UI，覆盖 Dashboard、藏酒列表、酒瓶详情、手动入库、酒标入库、酒柜地图、Transaction 历史、CSV 导出、CSV 导入草稿和 WineList Excel 导入 dry-run/确认。
 
 项目仍保持本地单用户、无云同步、无账号权限、无真实 AI/OCR、无价格爬虫、无推荐引擎。当前酒标草稿使用本地 mock filename heuristic，只用于流程演示和字段预填。
 
@@ -46,21 +64,26 @@
 11. 2026-06-13：实现酒标图片 intake workflow：本地上传、元数据记录、mock 草稿、前端编辑确认，并通过 `IN` ledger 入库。
 12. 2026-06-13：重构前端结构，将 1616 行 `App.tsx` 拆分为 58 行 shell/routing composition，并新增 pages/components/hooks/utils/domain 模块。
 13. 2026-06-13：为 CSV confirm 增加批量事务边界，成功导入返回 bottle id 和 `IN` transaction id，中途失败整批 rollback。
+14. 2026-06-13：实现 WineList Stock 真实库存导入，新增 import batch 审计表、后端 draft/confirm API、前端库存导入入口和安全导入规则文档。
+15. 2026-06-13：实现 Import Batch Detail / Review，新增批次 list/detail API 和前端历史审计视图。
 
 ## 本次变更涉及的主要模块
 
-- `apps/api/app/services/csv_import_service.py`：CSV confirm 统一在批次末尾提交，异常时 rollback。
-- `apps/api/app/services/inventory_service.py`：入库服务新增可返回 bottle + transaction 且由外层控制 commit 的路径。
-- `apps/api/app/schemas/common.py`：CSV confirm 响应新增 `created_transaction_ids`。
-- `apps/api/tests/test_csv_import.py`：补充成功 ledger id 和中途失败整批回滚测试。
-- `apps/web/src/types.ts`：同步 CSV confirm 响应类型。
+- `apps/api/app/services/winelist_import_service.py`：解析 WineList Stock、生成 draft、执行 atomic confirm，并复用 Producer/Wine/Vintage registry。
+- `apps/api/app/models/import_batch.py`：新增 import batch 和 import row 审计模型。
+- `apps/api/app/routers/winelist_import.py`：新增 WineList draft/confirm API。
+- `apps/api/app/routers/import_batches.py`：新增导入批次只读 list/detail API。
+- `apps/api/migrations/versions/20260613_0002_import_batches.py`：新增导入审计表 migration。
+- `apps/api/tests/test_winelist_import.py`：覆盖真实样本 dry-run、119 瓶展开、重复导入阻止和 confirm 失败 rollback。
+- `apps/web/src/pages/CsvImportPage.tsx`：新增 WineList Excel 导入 UI、Import Batch History/Detail，并保留 CSV 导入草稿。
+- `docs/17-real-inventory-import.md`：新增真实库存导入规则、字段映射、位置映射和限制。
 
 ## 最新验证结果
 
-- `C:\Users\lukai\AppData\Local\Programs\Python\Python313\python.exe -m pytest -q`，工作目录 `apps/api`：通过，`39 passed in 8.48s`。
+- `python -m pytest -q`，工作目录 `apps/api`：通过，`43 passed in 10.97s`。
 - `npm.cmd run test:ui`，工作目录 `apps/web`：通过，`1 passed`。
 - `npm.cmd run build`，工作目录 `apps/web`：通过，Vite `8.0.16` production build 成功。
-- `$env:WINE_CELLAR_PYTHON='C:\Users\lukai\AppData\Local\Programs\Python\Python313\python.exe'; npm.cmd run qa:alpha`，工作目录 `apps/web`：通过，`failures: []`，包含 `importedBottles: 1`、`total_bottles: 6`、`in_stock_bottles: 2`、`health_score: 79`。
+- `npm.cmd run qa:alpha`，工作目录 `apps/web`：通过，`failures: []`，包含 `importedBottles: 1`、`total_bottles: 6`、`in_stock_bottles: 2`、`health_score: 79`。
 
 ## 已知限制
 
@@ -71,13 +94,15 @@
 - 已上传酒标图片暂未在 bottle detail 回看。
 - 前端已完成第一轮页面/组件拆分；`CellarPage`、`AddBottlePage`、`LabelIntakePage` 仍可继续拆成更小的 feature components。
 - `styles.css` 仍是单文件样式表，后续可按 layout/page/component 分段整理。
-- 没有 Excel 导入、模板下载、导入历史和导入回滚。
+- WineList Excel 导入只支持 `Stock` sheet；不是通用 Excel 导入器，也不导入 shipment、HKStock、盲品或价格参考表。
+- 没有导入批次撤销或 rollback wizard；如需撤销，应通过 ledger 补偿流程设计，不应删除原始 transaction。
+- CSV 仍没有模板下载、导入历史和导入回滚。
 - 没有真实 AI/OCR、价格 provider、云同步、账号权限、多用户、支付、电商、社区或推荐引擎。
 
 ## 下一步建议任务
 
-1. 继续细拆 `CellarPage`、`AddBottlePage`、`LabelIntakePage` 内部表单组件，降低单页文件长度。
-2. 为酒标 intake 增加持久化 draft/reject 历史和 bottle detail 图片回看。
-3. 为 CSV 导入补充“下载模板 CSV”和“只显示无效行/有效行”的前端辅助操作。
-4. 为 CSV 导入增加 import batch 记录，追踪一次批量导入的来源、行数和结果。
+1. 为 WineList 导入设计人工撤销/补偿流程，但保持 ledger 不可篡改，不做删除式 rollback。
+2. 继续细拆 `CellarPage`、`AddBottlePage`、`LabelIntakePage` 内部表单组件，降低单页文件长度。
+3. 为酒标 intake 增加持久化 draft/reject 历史和 bottle detail 图片回看。
+4. 为 CSV 导入补充“下载模板 CSV”和“只显示无效行/有效行”的前端辅助操作。
 5. 增加数据库恢复演练文档和示例数据隔离检查。
