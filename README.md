@@ -79,6 +79,42 @@ python -m uvicorn app.main:app --reload
 $env:WINE_CELLAR_DATABASE_URL = "sqlite:///./data/dev.db"
 ```
 
+## 本地数据库迁移与备份
+
+项目默认继续使用 SQLite。正式保留数据的本地库不要再通过删除数据库来升级 schema；先备份，再运行 Alembic migration。
+
+在 `apps/api` 目录执行：
+
+```powershell
+cd D:\MyLife\17_葡萄酒管理系统\apps\api
+python -m pip install -e ".[dev]"
+
+# 备份默认本地 SQLite 数据库；数据库不存在时只提示，不会创建或删除文件
+python scripts\backup_sqlite_db.py
+
+# 初始化空数据库或升级已有 Alpha 数据库到最新 schema
+python -m alembic upgrade head
+```
+
+如果使用自定义数据库路径，先设置同一个环境变量再备份和升级：
+
+```powershell
+$env:WINE_CELLAR_DATABASE_URL = "sqlite:///D:/path/to/wine_cellar.db"
+python scripts\backup_sqlite_db.py
+python -m alembic upgrade head
+```
+
+只在本地开发库、且确认不需要保留数据时，才手动重置数据库：
+
+```powershell
+cd D:\MyLife\17_葡萄酒管理系统\apps\api
+python scripts\backup_sqlite_db.py
+Remove-Item -LiteralPath .\wine_cellar.db
+python -m alembic upgrade head
+```
+
+不要对真实库存库执行静默删除或批量覆盖。迁移细节见 `docs/16-database-migrations.md`。
+
 前端位于 `apps/web`，使用 Vite + React + TypeScript。
 
 ```powershell

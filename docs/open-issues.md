@@ -4,6 +4,7 @@
 
 ## 2026-06-13 新增说明
 
+- 本地数据库迁移已引入 Alembic baseline。剩余风险从“没有迁移工具”转为“旧库 schema 若偏离当前模型，需要专门增量 migration，不应靠删除数据库解决”。
 - Dashboard 酒窖健康分已经可用，但只基于本地库存、位置容量和手工适饮期字段计算；它不能替代专业品鉴、储存检查、价格估值或投资建议。
 
 ## 确认 Bug
@@ -19,7 +20,7 @@
 | 优先级 | 问题 | 风险 | 建议处理 |
 | --- | --- | --- | --- |
 | P1 | CSV confirm 复用现有入库服务逐行提交，虽然有预检，但不是全局事务。 | 未来复杂导入出现异常时可能部分提交。 | 增加 batch import transaction boundary，或让 InventoryService 支持外层事务控制。 |
-| P1 | 没有数据库迁移工具。 | 模型变更时本地 Alpha 数据升级成本高。 | 引入 Alembic 或明确本地迁移脚本策略。 |
+| P1 | Alembic baseline 已有，但历史偏离 schema 的旧库仍需要专门增量迁移。 | 用户如果跳过备份或直接删除数据库，仍可能丢失 Alpha 数据。 | 后续每次模型变更都必须新增 migration，并在升级前运行 SQLite 备份脚本。 |
 | P2 | 前端部分 page 文件仍较大，尤其 `CellarPage`、`AddBottlePage`、`LabelIntakePage`。 | 后续继续扩展表单和交互时维护成本仍会上升。 | 继续拆分 feature components/forms，并保持现有 smoke test。 |
 | P3 | 前端 `styles.css` 仍是单文件样式表。 | 样式增长后难以定位页面/组件归属。 | 后续按 layout、page、component 分段或拆分样式文件。 |
 | P2 | API 测试 fixture 在多个测试文件中重复。 | 测试维护成本上升。 | 提取到 `tests/conftest.py`。 |

@@ -24,6 +24,7 @@ coverage/
 /apps/api/*.db
 /apps/api/*.sqlite
 /apps/api/*.sqlite3
+/apps/api/backups/
 /apps/api/.alpha-qa-data/
 /apps/api/.alpha-qa-smoke.db
 /data/*.sqlite

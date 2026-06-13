@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Local-first Wine Cellar OS API"
 requires-python = ">=3.11"
 dependencies = [
+    "alembic>=1.13,<2.0",
     "fastapi>=0.115,<1.0",
     "python-multipart>=0.0.9,<1.0",
     "sqlalchemy>=2.0,<3.0",
@@ -23,3 +24,6 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.setuptools.packages.find]
+include = ["app*"]

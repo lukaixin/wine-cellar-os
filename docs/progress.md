@@ -2,6 +2,14 @@
 
 最后更新：2026-06-13
 
+## 2026-06-13 更新：本地数据库迁移策略
+
+- 新增 Alembic 迁移配置，默认继续使用 SQLite，并通过 `WINE_CELLAR_DATABASE_URL` 指向目标数据库。
+- 新增初始 Alpha baseline migration，可从空数据库创建当前 schema，也可在已有当前 Alpha SQLite 库上写入 Alembic 版本记录而不删除数据。
+- 新增 `scripts/backup_sqlite_db.py`，用于迁移前复制本地 SQLite 文件到 `backups/`。
+- 新增迁移 smoke 测试，覆盖空库 upgrade 和已有 Alpha schema upgrade 后数据保留。
+- 新增 `docs/16-database-migrations.md`，README 已补充初始化、升级、备份和本地开发库 reset 命令。
+
 ## 2026-06-13 更新：适饮期规则引擎与酒窖健康洞察
 
 - 新增后端规则服务，基于 `Vintage.default_drink_from/default_drink_to/drink_window_confidence` 和服务器当前日期计算 `UNKNOWN`、`TOO_EARLY`、`ENTERING`、`IN_WINDOW`、`LATE`、`PAST`。
