@@ -6,12 +6,14 @@ import {
   bottleLocationIssue,
   bottleTitle,
   formatDrinkWindow,
+  formatDrinkWindowStatus,
   formatLocation,
   formatPrice,
   isBottleAvailable,
   sortByOccurredAtAsc,
 } from "../utils/wine";
 import { TransactionTimeline } from "../components/transactions/TransactionTimeline";
+import { DrinkWindowBadge } from "../components/ui/DrinkWindowBadge";
 import { Select, TextInput } from "../components/ui/FormControls";
 import { InfoItem } from "../components/ui/InfoItem";
 import { StatusBadge } from "../components/ui/StatusBadge";
@@ -37,6 +39,7 @@ export function BottleDetailPage({
         </div>
         <div className="status-cluster">
           <StatusBadge status={bottle.current_status} />
+          <DrinkWindowBadge status={bottle.drink_window_status} />
           <span className="pill">{bottle.bottle_size_ml}ml</span>
         </div>
       </div>
@@ -46,8 +49,10 @@ export function BottleDetailPage({
         <div className="detail-grid">
           <InfoItem label="国家/产区" value={bottle.country || "-"} />
           <InfoItem label="类型" value={bottle.wine_type || "-"} />
+          <InfoItem label="适饮状态" value={formatDrinkWindowStatus(bottle)} />
           <InfoItem label="适饮期" value={formatDrinkWindow(bottle)} />
           <InfoItem label="适饮置信度" value={bottle.drink_window_confidence || "-"} />
+          <InfoItem label="适饮说明" value={bottle.drink_window_message || "-"} />
           <InfoItem label="购入日期" value={bottle.acquisition_date || "-"} />
           <InfoItem label="购入价格" value={formatPrice(bottle)} />
           <InfoItem label="购买来源" value={bottle.purchase_source || "-"} />

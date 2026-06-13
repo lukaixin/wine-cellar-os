@@ -2,6 +2,14 @@
 
 最后更新：2026-06-13
 
+## 2026-06-13 更新：适饮期规则引擎与酒窖健康洞察
+
+- 新增后端规则服务，基于 `Vintage.default_drink_from/default_drink_to/drink_window_confidence` 和服务器当前日期计算 `UNKNOWN`、`TOO_EARLY`、`ENTERING`、`IN_WINDOW`、`LATE`、`PAST`。
+- 扩展 `/api/dashboard/summary`，保留原有统计字段，并新增适饮期细分、近期可喝候选、过期风险清单、可用/不可用瓶数、酒窖健康评分和评分因子说明。
+- 前端 Dashboard 增加酒窖健康面板、适饮状态分布、近期可喝与过期风险列表；藏酒列表和详情页显示适饮状态徽标。
+- 新增 `docs/15-drink-window-rules.md`，说明规则边界、状态定义、dashboard 健康分算法和非目标。
+- 最新验证：后端 `pytest`、前端 `test:ui`、前端 `build`、`qa:alpha` 均已通过。
+
 ## 当前项目状态
 
 当前处于本地 Alpha Demo 阶段。后端已具备 FastAPI + SQLite + SQLAlchemy 基础模型、CRUD API、库存 transaction workflow、Dashboard、CSV 导出、安全 CSV 导入草稿工作流，以及本地酒标图片 intake 草稿工作流。前端已具备 React + Vite Alpha UI，覆盖 Dashboard、藏酒列表、酒瓶详情、手动入库、酒标入库、酒柜地图、Transaction 历史、CSV 导出和 CSV 导入草稿。

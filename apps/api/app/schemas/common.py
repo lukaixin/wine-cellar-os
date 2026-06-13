@@ -245,6 +245,10 @@ class BottleRead(OrmModel):
     default_drink_from: int | None = None
     default_drink_to: int | None = None
     drink_window_confidence: str | None = None
+    drink_window_status: str = "UNKNOWN"
+    drink_window_message: str | None = None
+    years_until_drink_window: int | None = None
+    years_past_drink_window: int | None = None
     wine_type: str | None = None
     country: str | None = None
     cellar_name: str | None = None
@@ -278,18 +282,57 @@ class InventoryTransactionRead(OrmModel):
     to_location_code: str | None = None
 
 
+DrinkWindowStatusValue = Literal["UNKNOWN", "TOO_EARLY", "ENTERING", "IN_WINDOW", "LATE", "PAST"]
+
+
+class DashboardBottleInsight(BaseModel):
+    bottle_id: str
+    bottle_label: str
+    producer_name: str | None = None
+    wine_name: str | None = None
+    vintage_year: int | None = None
+    is_non_vintage: bool | None = None
+    cellar_name: str | None = None
+    location_code: str | None = None
+    drink_from: int | None = None
+    drink_to: int | None = None
+    drink_window_status: DrinkWindowStatusValue
+    drink_window_confidence: str | None = None
+    reason: str
+
+
+class DashboardHealthFactor(BaseModel):
+    key: str
+    label: str
+    score: int = Field(ge=0, le=100)
+    detail: str
+
+
+class DashboardHealthScore(BaseModel):
+    score: int = Field(ge=0, le=100)
+    label: str
+    factors: list[DashboardHealthFactor]
+    notes: list[str] = Field(default_factory=list)
+
+
 class DashboardSummary(BaseModel):
     total_bottles: int
     in_stock_bottles: int
+    available_bottles: int
     consumed_or_removed_bottles: int
+    unavailable_bottles: int
     cellar_count: int
     location_count: int
     recent_transactions: list[InventoryTransactionRead]
     status_counts: dict[str, int]
     drink_window_counts: dict[str, int]
+    drink_window_summary: dict[DrinkWindowStatusValue, int]
+    upcoming_drink_candidates: list[DashboardBottleInsight]
+    past_window_risks: list[DashboardBottleInsight]
     inventory_by_country: dict[str, int]
     inventory_by_type: dict[str, int]
     cellar_occupancy: list[dict[str, int | str]]
+    cellar_health_score: DashboardHealthScore
 
 
 class CsvImportDraftRequest(BaseModel):

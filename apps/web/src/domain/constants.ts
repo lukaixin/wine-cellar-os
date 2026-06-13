@@ -28,6 +28,15 @@ export const drinkWindowLabel: Record<string, string> = {
   future: "尚未到期",
 };
 
+export const drinkWindowStatusLabel: Record<string, string> = {
+  UNKNOWN: "未设置",
+  TOO_EARLY: "尚早",
+  ENTERING: "即将适饮",
+  IN_WINDOW: "适饮中",
+  LATE: "刚过期",
+  PAST: "已过期",
+};
+
 export function pageTitle(page: Page): string {
   return {
     dashboard: "Dashboard",

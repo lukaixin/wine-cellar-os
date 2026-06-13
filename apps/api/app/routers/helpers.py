@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Bottle, InventoryTransaction, Location, Vintage, Wine
+from app.services.drink_window_service import classify_vintage
 
 T = TypeVar("T")
 
@@ -97,6 +98,7 @@ def bottle_to_read(bottle: Bottle) -> dict[str, Any]:
     producer = wine.producer if wine else None
     location = bottle.current_location
     cellar = location.cellar if location else None
+    drink_window = classify_vintage(vintage)
     return {
         "id": bottle.id,
         "vintage_id": bottle.vintage_id,
@@ -123,6 +125,7 @@ def bottle_to_read(bottle: Bottle) -> dict[str, Any]:
         "default_drink_from": vintage.default_drink_from if vintage else None,
         "default_drink_to": vintage.default_drink_to if vintage else None,
         "drink_window_confidence": vintage.drink_window_confidence if vintage else None,
+        **drink_window.to_read_dict(),
         "wine_type": wine.type if wine else None,
         "country": wine.country or producer.country if wine and producer else (wine.country if wine else None),
         "cellar_name": cellar.name if cellar else None,

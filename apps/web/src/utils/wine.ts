@@ -1,3 +1,4 @@
+import { drinkWindowStatusLabel } from "../domain/constants";
 import type { Bottle, InventoryTransaction, Location } from "../types";
 
 export function normalize(value: unknown): string {
@@ -21,6 +22,11 @@ export function formatLocation(bottle: Bottle): string {
 export function formatDrinkWindow(bottle: Bottle): string {
   if (!bottle.default_drink_from || !bottle.default_drink_to) return "未设置";
   return `${bottle.default_drink_from}-${bottle.default_drink_to}`;
+}
+
+export function formatDrinkWindowStatus(bottle: Bottle): string {
+  const status = bottle.drink_window_status ?? "UNKNOWN";
+  return drinkWindowStatusLabel[status] ?? status;
 }
 
 export function formatPrice(bottle: Bottle): string {

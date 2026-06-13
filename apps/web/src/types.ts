@@ -48,6 +48,8 @@ export type Location = {
   location_type: string;
 };
 
+export type DrinkWindowStatus = "UNKNOWN" | "TOO_EARLY" | "ENTERING" | "IN_WINDOW" | "LATE" | "PAST";
+
 export type Bottle = {
   id: string;
   vintage_id: string;
@@ -70,6 +72,10 @@ export type Bottle = {
   default_drink_from?: number | null;
   default_drink_to?: number | null;
   drink_window_confidence?: string | null;
+  drink_window_status?: DrinkWindowStatus;
+  drink_window_message?: string | null;
+  years_until_drink_window?: number | null;
+  years_past_drink_window?: number | null;
   wine_type?: string | null;
   country?: string | null;
   cellar_name?: string | null;
@@ -94,12 +100,17 @@ export type InventoryTransaction = {
 export type DashboardSummary = {
   total_bottles: number;
   in_stock_bottles: number;
+  available_bottles: number;
   consumed_or_removed_bottles: number;
+  unavailable_bottles: number;
   cellar_count: number;
   location_count: number;
   recent_transactions: InventoryTransaction[];
   status_counts: Record<string, number>;
   drink_window_counts: Record<string, number>;
+  drink_window_summary: Record<DrinkWindowStatus, number>;
+  upcoming_drink_candidates: DashboardBottleInsight[];
+  past_window_risks: DashboardBottleInsight[];
   inventory_by_country: Record<string, number>;
   inventory_by_type: Record<string, number>;
   cellar_occupancy: Array<{
@@ -109,6 +120,37 @@ export type DashboardSummary = {
     occupied: number;
     empty: number;
   }>;
+  cellar_health_score: DashboardHealthScore;
+};
+
+export type DashboardBottleInsight = {
+  bottle_id: string;
+  bottle_label: string;
+  producer_name?: string | null;
+  wine_name?: string | null;
+  vintage_year?: number | null;
+  is_non_vintage?: boolean | null;
+  cellar_name?: string | null;
+  location_code?: string | null;
+  drink_from?: number | null;
+  drink_to?: number | null;
+  drink_window_status: DrinkWindowStatus;
+  drink_window_confidence?: string | null;
+  reason: string;
+};
+
+export type DashboardHealthFactor = {
+  key: string;
+  label: string;
+  score: number;
+  detail: string;
+};
+
+export type DashboardHealthScore = {
+  score: number;
+  label: string;
+  factors: DashboardHealthFactor[];
+  notes: string[];
 };
 
 export type CsvImportRow = {

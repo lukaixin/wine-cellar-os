@@ -289,7 +289,11 @@ async function runSmoke() {
     dashboard.status === 200 &&
       dashboard.body.total_bottles === 6 &&
       dashboard.body.in_stock_bottles === 2 &&
-      dashboard.body.cellar_occupancy[0].occupied === 2,
+      dashboard.body.cellar_occupancy[0].occupied === 2 &&
+      dashboard.body.drink_window_summary.IN_WINDOW === 1 &&
+      dashboard.body.drink_window_summary.UNKNOWN === 1 &&
+      dashboard.body.upcoming_drink_candidates.length === 1 &&
+      dashboard.body.cellar_health_score.score >= 0,
     dashboard,
     failures,
   );
@@ -319,6 +323,8 @@ async function runSmoke() {
         total_bottles: dashboard.body.total_bottles,
         in_stock_bottles: dashboard.body.in_stock_bottles,
         cellar_occupied: dashboard.body.cellar_occupancy[0].occupied,
+        drink_window_summary: dashboard.body.drink_window_summary,
+        health_score: dashboard.body.cellar_health_score.score,
       },
       labelBottle: labelConfirm.body.bottle_id,
       importedBottles: importConfirm.body.created_bottles,

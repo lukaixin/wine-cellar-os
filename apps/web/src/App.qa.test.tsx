@@ -7,6 +7,7 @@ type Entity = Record<string, any>;
 
 function makeServer() {
   let id = 1;
+  const currentYear = 2026;
   const nextId = (prefix: string) => `${prefix}-${id++}`;
   const state = {
     producers: [] as Entity[],
@@ -31,12 +32,34 @@ function makeServer() {
     return { ...location, cellar_name: cellar?.name ?? null };
   }
 
-  function bottleRead(bottle: Entity) {
+  function classifyDrinkWindow(vintage?: Entity) {
+    const drinkFrom = vintage?.default_drink_from ?? null;
+    const drinkTo = vintage?.default_drink_to ?? null;
+    if (!drinkFrom || !drinkTo) {
+      return { status: "UNKNOWN", message: "未设置完整适饮期。", yearsUntil: null, yearsPast: null };
+    }
+    if (currentYear < drinkFrom - 1) {
+      return { status: "TOO_EARLY", message: `距离适饮期开始还有 ${drinkFrom - currentYear} 年。`, yearsUntil: drinkFrom - currentYear, yearsPast: null };
+    }
+    if (currentYear < drinkFrom) {
+      return { status: "ENTERING", message: "即将进入适饮期。", yearsUntil: drinkFrom - currentYear, yearsPast: null };
+    }
+    if (currentYear <= drinkTo) {
+      return { status: "IN_WINDOW", message: "当前处于适饮期。", yearsUntil: 0, yearsPast: null };
+    }
+    if (currentYear === drinkTo + 1) {
+      return { status: "LATE", message: "刚过建议适饮期，需要优先检查。", yearsUntil: null, yearsPast: 1 };
+    }
+    return { status: "PAST", message: `已超过建议适饮期 ${currentYear - drinkTo} 年。`, yearsUntil: null, yearsPast: currentYear - drinkTo };
+  }
+
+  function bottleRead(bottle: Entity): Entity {
     const vintage = state.vintages.find((item) => item.id === bottle.vintage_id);
     const wine = state.wines.find((item) => item.id === vintage?.wine_id);
     const producer = state.producers.find((item) => item.id === wine?.producer_id);
     const location = state.locations.find((item) => item.id === bottle.current_location_id);
     const cellar = state.cellars.find((item) => item.id === location?.cellar_id);
+    const drinkWindow = classifyDrinkWindow(vintage);
     return {
       ...bottle,
       producer_name: producer?.name_original ?? null,
@@ -48,6 +71,10 @@ function makeServer() {
       default_drink_from: vintage?.default_drink_from ?? null,
       default_drink_to: vintage?.default_drink_to ?? null,
       drink_window_confidence: vintage?.drink_window_confidence ?? null,
+      drink_window_status: drinkWindow.status,
+      drink_window_message: drinkWindow.message,
+      years_until_drink_window: drinkWindow.yearsUntil,
+      years_past_drink_window: drinkWindow.yearsPast,
       wine_type: wine?.type ?? null,
       country: wine?.country ?? producer?.country ?? null,
       cellar_name: cellar?.name ?? null,
@@ -83,16 +110,47 @@ function makeServer() {
 
   function dashboardSummary() {
     const inStock = state.bottles.filter((bottle) => bottle.current_status === "in_stock");
+    const inStockReads = inStock.map(bottleRead);
     const occupiedByLocation = new Map<string, number>();
     for (const bottle of inStock) {
       if (bottle.current_location_id) {
         occupiedByLocation.set(bottle.current_location_id, (occupiedByLocation.get(bottle.current_location_id) ?? 0) + 1);
       }
     }
+    const drinkWindowSummary = {
+      UNKNOWN: 0,
+      TOO_EARLY: 0,
+      ENTERING: 0,
+      IN_WINDOW: 0,
+      LATE: 0,
+      PAST: 0,
+    };
+    for (const bottle of inStockReads) {
+      drinkWindowSummary[bottle.drink_window_status as keyof typeof drinkWindowSummary] += 1;
+    }
+    const insights = inStockReads.map((bottle) => ({
+      bottle_id: bottle.id,
+      bottle_label: `${bottle.producer_name ?? ""} · ${bottle.wine_name ?? "Wine"} · ${bottle.is_non_vintage ? "NV" : bottle.vintage_year}`,
+      producer_name: bottle.producer_name,
+      wine_name: bottle.wine_name,
+      vintage_year: bottle.vintage_year,
+      is_non_vintage: bottle.is_non_vintage,
+      cellar_name: bottle.cellar_name,
+      location_code: bottle.location_code,
+      drink_from: bottle.default_drink_from,
+      drink_to: bottle.default_drink_to,
+      drink_window_status: bottle.drink_window_status,
+      drink_window_confidence: bottle.drink_window_confidence,
+      reason: bottle.drink_window_message,
+    }));
+    const knownWindowCount = inStockReads.length - drinkWindowSummary.UNKNOWN;
+    const healthScore = inStockReads.length ? Math.round((knownWindowCount / inStockReads.length) * 35 + 35 + 20 + 10) : 60;
     return {
       total_bottles: state.bottles.length,
       in_stock_bottles: inStock.length,
+      available_bottles: inStock.length,
       consumed_or_removed_bottles: state.bottles.length - inStock.length,
+      unavailable_bottles: state.bottles.length - inStock.length,
       cellar_count: state.cellars.length,
       location_count: state.locations.length,
       recent_transactions: state.transactions.slice().reverse().slice(0, 8).map(transactionRead),
@@ -101,6 +159,9 @@ function makeServer() {
         return acc;
       }, {}),
       drink_window_counts: { entering: inStock.length, past: 0, without: 0, future: 0 },
+      drink_window_summary: drinkWindowSummary,
+      upcoming_drink_candidates: insights.filter((item) => ["ENTERING", "IN_WINDOW"].includes(item.drink_window_status)),
+      past_window_risks: insights.filter((item) => ["LATE", "PAST"].includes(item.drink_window_status)),
       inventory_by_country: inStock.length ? { France: inStock.length } : {},
       inventory_by_type: inStock.length ? { red: inStock.length } : {},
       cellar_occupancy: state.cellars.map((cellar) => {
@@ -109,6 +170,17 @@ function makeServer() {
         const occupied = locations.reduce((sum, location) => sum + (occupiedByLocation.get(location.id) ?? 0), 0);
         return { cellar_id: cellar.id, name: cellar.name, capacity, occupied, empty: capacity - occupied };
       }),
+      cellar_health_score: {
+        score: healthScore,
+        label: healthScore >= 85 ? "健康" : "需要关注",
+        factors: [
+          { key: "drink_window_coverage", label: "适饮期覆盖率", score: knownWindowCount ? 100 : 60, detail: `${knownWindowCount}/${inStockReads.length} 瓶在库酒有完整适饮期。` },
+          { key: "overdue_risk", label: "过期风险", score: 100, detail: "0 瓶在库酒已晚于建议适饮期。" },
+          { key: "occupancy_pressure", label: "酒柜容量压力", score: 100, detail: "测试酒柜容量正常。" },
+          { key: "availability_balance", label: "可用库存平衡", score: 100, detail: `${inStock.length} 瓶可用。` },
+        ],
+        notes: ["测试环境使用本地 mock 评分。"],
+      },
     };
   }
 
@@ -466,7 +538,8 @@ describe("Alpha UI smoke", () => {
     expect(screen.getAllByText("盘点调整").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: "Dashboard" }));
-    await waitFor(() => expect(screen.getByText("正在适饮")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("酒窖健康").length).toBeGreaterThan(0));
+    expect(screen.getByText("适饮状态")).toBeTruthy();
     expect(screen.getByText("1/6 已占用，5 空位")).toBeTruthy();
-  });
+  }, 15000);
 });

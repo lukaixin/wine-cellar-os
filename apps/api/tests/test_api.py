@@ -280,6 +280,8 @@ def test_dashboard_summary_uses_real_data(client: TestClient) -> None:
     assert body["total_bottles"] == 1
     assert body["in_stock_bottles"] == 1
     assert body["recent_transactions"][0]["transaction_type"] == "IN"
+    assert body["drink_window_summary"]["UNKNOWN"] == 1
+    assert body["cellar_health_score"]["factors"]
 
 
 def test_location_capacity_rejects_overfilled_add_and_move(client: TestClient) -> None:
@@ -391,12 +393,20 @@ def test_dashboard_summary_includes_drink_window_and_occupancy(client: TestClien
         json={"vintage_id": vintage.json()["id"], "current_location_id": locations.json()[0]["id"]},
     )
     assert bottle.status_code == 201
+    assert bottle.json()["drink_window_status"] == "IN_WINDOW"
 
     response = client.get("/api/dashboard/summary")
 
     assert response.status_code == 200
     body = response.json()
     assert body["drink_window_counts"]["entering"] == 1
+    assert body["drink_window_summary"]["IN_WINDOW"] == 1
+    assert body["available_bottles"] == 1
+    assert body["unavailable_bottles"] == 0
+    assert body["upcoming_drink_candidates"][0]["bottle_id"] == bottle.json()["id"]
+    assert body["upcoming_drink_candidates"][0]["drink_window_status"] == "IN_WINDOW"
+    assert body["past_window_risks"] == []
+    assert 0 <= body["cellar_health_score"]["score"] <= 100
     assert body["inventory_by_country"] == {"France": 1}
     assert body["inventory_by_type"] == {"red": 1}
     assert body["cellar_occupancy"] == [

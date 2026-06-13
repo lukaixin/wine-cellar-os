@@ -295,6 +295,42 @@ tr.clickable:hover {
   color: #6f5042;
 }
 
+.drink-window-badge {
+  border-radius: 999px;
+  font-weight: 600;
+  padding: 6px 10px;
+}
+
+.drink-window-badge.unknown {
+  background: #f1e9df;
+  color: #6f5042;
+}
+
+.drink-window-badge.too_early {
+  background: #e6f0f6;
+  color: #235875;
+}
+
+.drink-window-badge.entering {
+  background: #fff5d8;
+  color: #684d0c;
+}
+
+.drink-window-badge.in_window {
+  background: #e7f5e7;
+  color: #1d6b29;
+}
+
+.drink-window-badge.late {
+  background: #ffe8d6;
+  color: #8a3d13;
+}
+
+.drink-window-badge.past {
+  background: #ffe8e3;
+  color: #7d1f2d;
+}
+
 .pill {
   border: 1px solid #cfb360;
   border-radius: 999px;
@@ -334,6 +370,64 @@ tr.clickable:hover {
 .occupancy-row span {
   color: #69665f;
   font-size: 13px;
+}
+
+.health-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.health-header {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.health-header p {
+  color: #69665f;
+  margin: 4px 0 0;
+}
+
+.health-header strong {
+  color: #7d1f2d;
+  font-size: 30px;
+}
+
+.health-factor-list {
+  display: grid;
+  gap: 12px;
+}
+
+.health-factor {
+  display: grid;
+  gap: 6px;
+}
+
+.health-factor div {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.health-factor p {
+  color: #69665f;
+  margin: 0;
+}
+
+.insight-list {
+  margin-bottom: 0;
+}
+
+.compact-list button.insight-button {
+  align-items: stretch;
+  display: grid;
+  gap: 4px;
+  justify-content: stretch;
+}
+
+.insight-button small {
+  color: #69665f;
 }
 
 progress {

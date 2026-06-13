@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { statusLabel } from "../domain/constants";
+import { drinkWindowStatusLabel, statusLabel } from "../domain/constants";
 import type { AppData } from "../types";
 import { formatDrinkWindow, formatLocation, formatPrice, formatVintage, normalize } from "../utils/wine";
 import { DataTable } from "../components/ui/DataTable";
+import { DrinkWindowBadge } from "../components/ui/DrinkWindowBadge";
 import { Select, TextInput } from "../components/ui/FormControls";
 import { StatusBadge } from "../components/ui/StatusBadge";
 
@@ -21,6 +22,8 @@ export function BottlesPage({ data, openBottle }: { data: AppData; openBottle: (
         bottle.vintage_year,
         bottle.current_status,
         statusLabel[bottle.current_status],
+        bottle.drink_window_status,
+        drinkWindowStatusLabel[bottle.drink_window_status ?? "UNKNOWN"],
         bottle.cellar_name,
         bottle.location_code,
         bottle.country,
@@ -60,7 +63,7 @@ export function BottlesPage({ data, openBottle }: { data: AppData; openBottle: (
       </section>
       <section className="panel">
         <DataTable
-          headers={["酒庄", "酒款", "年份", "状态", "位置", "适饮期", "价格"]}
+          headers={["酒庄", "酒款", "年份", "库存状态", "位置", "适饮状态", "适饮期", "价格"]}
           empty={data.bottles.length ? "没有匹配的藏酒。" : "暂无藏酒。"}
           rows={filtered.map((bottle) => ({
             key: bottle.id,
@@ -71,6 +74,7 @@ export function BottlesPage({ data, openBottle }: { data: AppData; openBottle: (
               formatVintage(bottle),
               <StatusBadge key="status" status={bottle.current_status} />,
               formatLocation(bottle),
+              <DrinkWindowBadge key="drink-window" status={bottle.drink_window_status} />,
               formatDrinkWindow(bottle),
               formatPrice(bottle),
             ],
