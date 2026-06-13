@@ -1,0 +1,33 @@
+# Directory Tree
+
+```text
+wine-cellar-os-bootstrap/
+  .env.example
+  .gitignore
+  AGENTS.md
+  README.md
+    00-project-brief.md
+    01-product-prd-v0.1.md
+    02-mvp-scope.md
+    03-domain-glossary.md
+    04-data-model.md
+    05-ux-flows.md
+    06-api-contract.md
+    07-local-first-architecture.md
+    08-roadmap.md
+    09-compliance-data-policy.md
+    10-codex-task-backlog.md
+    11-good-ideas-backlog.md
+      ADR-0001-local-first.md
+      ADR-0002-ledger-inventory.md
+      ADR-0003-price-provider-adapter.md
+      00-bootstrap-repo.md
+      01-implement-database-schema.md
+      02-implement-cellar-grid.md
+      03-implement-inventory-ledger.md
+      04-implement-ai-label-intake.md
+      05-review-checklist.md
+    README.md
+    README.md
+    README.md
+```
