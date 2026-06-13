@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.database import create_app_engine, get_session
 from app.main import app
 from app.models import Base
+from app.services.csv_import_service import CsvImportService
 
 
 @pytest.fixture()
@@ -83,6 +84,7 @@ def test_csv_import_confirm_creates_bottle_through_in_ledger(client: TestClient)
     body = confirm.json()
     assert body["created_bottles"] == 1
     bottle_id = body["created_bottle_ids"][0]
+    transaction_id = body["created_transaction_ids"][0]
     bottle = client.get(f"/api/bottles/{bottle_id}")
     assert bottle.status_code == 200
     bottle_body = bottle.json()
@@ -93,6 +95,7 @@ def test_csv_import_confirm_creates_bottle_through_in_ledger(client: TestClient)
     timeline = client.get(f"/api/bottles/{bottle_id}/transactions")
     assert timeline.status_code == 200
     assert [item["transaction_type"] for item in timeline.json()] == ["IN"]
+    assert timeline.json()[0]["id"] == transaction_id
     assert timeline.json()[0]["actor"] == "csv_import"
 
 
@@ -131,5 +134,61 @@ def test_csv_import_confirm_rejects_batch_over_capacity_without_creating_bottles
 
     assert response.status_code == 422
     assert "full for import" in response.json()["detail"]
+    assert client.get("/api/bottles").json() == []
+    assert client.get("/api/inventory-transactions").json() == []
+
+
+def test_csv_import_confirm_rolls_back_whole_batch_on_mid_batch_failure(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cellar = client.post("/api/cellars", json={"name": "Rollback Cellar", "cellar_type": "cabinet"})
+    assert cellar.status_code == 201
+    for code in ["R-01-01", "R-01-02"]:
+        location = client.post(
+            "/api/locations",
+            json={"cellar_id": cellar.json()["id"], "code": code, "row_index": 1, "column_index": 1, "capacity": 1},
+        )
+        assert location.status_code == 201
+
+    original_create = CsvImportService._create_imported_bottle
+    calls = 0
+
+    def fail_second_row(self, row, location):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("forced mid-batch failure")
+        return original_create(self, row, location)
+
+    monkeypatch.setattr(CsvImportService, "_create_imported_bottle", fail_second_row)
+    rows = [
+        {
+            "producer_name": "Rollback Estate",
+            "wine_name": "Rollback Red",
+            "vintage_year": 2020,
+            "bottle_size_ml": 750,
+            "cellar_name": "Rollback Cellar",
+            "location_code": "R-01-01",
+            "purchase_currency": "CNY",
+            "tags": [],
+        },
+        {
+            "producer_name": "Rollback Estate",
+            "wine_name": "Rollback White",
+            "vintage_year": 2021,
+            "bottle_size_ml": 750,
+            "cellar_name": "Rollback Cellar",
+            "location_code": "R-01-02",
+            "purchase_currency": "CNY",
+            "tags": [],
+        },
+    ]
+
+    response = client.post("/api/import/csv/confirm", json={"rows": rows})
+
+    assert response.status_code == 500
+    assert "rolled back" in response.json()["detail"]
+    assert calls == 2
     assert client.get("/api/bottles").json() == []
     assert client.get("/api/inventory-transactions").json() == []

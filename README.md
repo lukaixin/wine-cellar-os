@@ -175,7 +175,7 @@ Frontend: http://127.0.0.1:5173
 http://127.0.0.1:8000/api/export/bottles.csv
 ```
 
-CSV 当前支持导出和安全导入草稿。导入不会在解析阶段创建酒瓶或 transaction；只有用户确认全部有效行后，后端才会通过 `IN` ledger 规则创建库存。
+CSV 当前支持导出和安全导入草稿。导入不会在解析阶段创建酒瓶或 transaction；只有用户确认全部有效行后，后端才会通过 `IN` ledger 规则创建库存。确认导入使用单个数据库事务：同一批次中任意一行在写入阶段失败时，整批都会 rollback，不会留下部分 bottle 或部分 transaction。
 
 导入 CSV 最小字段：
 
@@ -189,7 +189,7 @@ producer_name,wine_name,vintage_year,bottle_size_ml,cellar_name,location_code
 country,region,type,purchase_price,purchase_currency,purchase_date,purchase_source,drink_from,drink_to,notes,tags
 ```
 
-导入确认前必须先存在目标 `cellar_name + location_code`。确认时会重新校验目标位置和容量；如果存在无效行或容量超限，不会直接修改库存。`tags` 当前只在草稿中解析展示，确认导入暂不写入标签关系。
+导入确认前必须先存在目标 `cellar_name + location_code`。确认时会重新校验目标位置和容量；如果存在无效行或容量超限，不会直接修改库存。成功响应会返回创建的 bottle id 和对应 `IN` transaction id。`tags` 当前只在草稿中解析展示，确认导入暂不写入标签关系。
 
 ## 给 Codex 的入口
 

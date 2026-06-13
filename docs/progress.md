@@ -2,6 +2,13 @@
 
 最后更新：2026-06-13
 
+## 2026-06-13 更新：CSV confirm 批量事务边界
+
+- CSV 导入确认改为单个数据库事务提交：批次内任意一行在写入阶段失败时，整批 rollback，不会留下部分 bottle 或部分 `IN` transaction。
+- `InventoryService` 保留默认自动提交行为，同时新增可被外层事务托管的入库结果路径，CSV confirm 复用同一套 ledger 规则且不直接修改库存快照。
+- CSV confirm 成功响应新增 `created_transaction_ids`，用于追踪每个导入 bottle 对应的 `IN` ledger 记录。
+- 新增后端测试覆盖成功导入的 transaction id，以及中途失败时 bottle 和 transaction 均不落库。
+
 ## 2026-06-13 更新：本地数据库迁移策略
 
 - 新增 Alembic 迁移配置，默认继续使用 SQLite，并通过 `WINE_CELLAR_DATABASE_URL` 指向目标数据库。
@@ -20,7 +27,7 @@
 
 ## 当前项目状态
 
-当前处于本地 Alpha Demo 阶段。后端已具备 FastAPI + SQLite + SQLAlchemy 基础模型、CRUD API、库存 transaction workflow、Dashboard、CSV 导出、安全 CSV 导入草稿工作流，以及本地酒标图片 intake 草稿工作流。前端已具备 React + Vite Alpha UI，覆盖 Dashboard、藏酒列表、酒瓶详情、手动入库、酒标入库、酒柜地图、Transaction 历史、CSV 导出和 CSV 导入草稿。
+当前处于本地 Alpha Demo 阶段。后端已具备 FastAPI + SQLite + SQLAlchemy 基础模型、CRUD API、库存 transaction workflow、Dashboard、CSV 导出、安全 CSV 导入草稿和批量事务确认工作流，以及本地酒标图片 intake 草稿工作流。前端已具备 React + Vite Alpha UI，覆盖 Dashboard、藏酒列表、酒瓶详情、手动入库、酒标入库、酒柜地图、Transaction 历史、CSV 导出和 CSV 导入草稿。
 
 项目仍保持本地单用户、无云同步、无账号权限、无真实 AI/OCR、无价格爬虫、无推荐引擎。当前酒标草稿使用本地 mock filename heuristic，只用于流程演示和字段预填。
 
@@ -38,34 +45,30 @@
 10. 2026-06-13：新增项目跟踪文档：`docs/progress.md`、`docs/roadmap.md`、`docs/open-issues.md`。
 11. 2026-06-13：实现酒标图片 intake workflow：本地上传、元数据记录、mock 草稿、前端编辑确认，并通过 `IN` ledger 入库。
 12. 2026-06-13：重构前端结构，将 1616 行 `App.tsx` 拆分为 58 行 shell/routing composition，并新增 pages/components/hooks/utils/domain 模块。
+13. 2026-06-13：为 CSV confirm 增加批量事务边界，成功导入返回 bottle id 和 `IN` transaction id，中途失败整批 rollback。
 
 ## 本次变更涉及的主要模块
 
-- `apps/web/src/App.tsx`：收缩为应用 shell/routing/state composition。
-- `apps/web/src/pages/`：新增 `DashboardPage`、`BottlesPage`、`BottleDetailPage`、`AddBottlePage`、`CellarPage`、`TransactionsPage`、`CsvImportPage`、`LabelIntakePage`。
-- `apps/web/src/components/layout/AppLayout.tsx`：抽出侧边栏、顶部栏、全局加载/错误/通知显示。
-- `apps/web/src/components/ui/`：抽出 `DataTable`、`FormControls`、`StatusBadge`、`EmptyPanel`、`InfoItem`、`Summary`。
-- `apps/web/src/components/transactions/`：抽出 `TransactionTable` 和 `TransactionTimeline`。
-- `apps/web/src/hooks/useAppData.ts`：集中管理 Alpha Demo 数据加载、刷新和 mutation 后刷新。
-- `apps/web/src/domain/constants.ts`：集中页面、状态、transaction 和适饮期文案。
-- `apps/web/src/utils/wine.ts`：集中酒瓶标题、位置、价格、状态和位置异常等纯函数。
+- `apps/api/app/services/csv_import_service.py`：CSV confirm 统一在批次末尾提交，异常时 rollback。
+- `apps/api/app/services/inventory_service.py`：入库服务新增可返回 bottle + transaction 且由外层控制 commit 的路径。
+- `apps/api/app/schemas/common.py`：CSV confirm 响应新增 `created_transaction_ids`。
+- `apps/api/tests/test_csv_import.py`：补充成功 ledger id 和中途失败整批回滚测试。
+- `apps/web/src/types.ts`：同步 CSV confirm 响应类型。
 
 ## 最新验证结果
 
-- `npm.cmd run build`，工作目录 `apps/web`：通过，Vite `8.0.16` production build 成功。
+- `C:\Users\lukai\AppData\Local\Programs\Python\Python313\python.exe -m pytest -q`，工作目录 `apps/api`：通过，`39 passed in 8.48s`。
 - `npm.cmd run test:ui`，工作目录 `apps/web`：通过，`1 passed`。
-- `C:\Users\lukai\AppData\Local\Programs\Python\Python313\python.exe -m pytest -q`，工作目录 `apps/api`：上一轮后端变更后通过，`29 passed in 5.59s`；本次前端重构未触碰后端代码。
-- `$env:WINE_CELLAR_PYTHON='C:\Users\lukai\AppData\Local\Programs\Python\Python313\python.exe'; npm.cmd run qa:alpha`，工作目录 `apps/web`：通过，`failures: []`，包含 `labelBottle`、`importedBottles: 1`、`total_bottles: 6`、`in_stock_bottles: 2`。
+- `npm.cmd run build`，工作目录 `apps/web`：通过，Vite `8.0.16` production build 成功。
+- `$env:WINE_CELLAR_PYTHON='C:\Users\lukai\AppData\Local\Programs\Python\Python313\python.exe'; npm.cmd run qa:alpha`，工作目录 `apps/web`：通过，`failures: []`，包含 `importedBottles: 1`、`total_bottles: 6`、`in_stock_bottles: 2`、`health_score: 79`。
 
 ## 已知限制
 
 - CSV 导入确认要求目标 `cellar_name + location_code` 已存在；当前不在导入时自动创建酒柜位置。
 - CSV `tags` 字段当前只解析和提示，不写入标签关系表。
-- CSV confirm 已做容量预检，但仍是逐行复用现有入库服务提交；如果未来引入更复杂写入，应补全全局事务边界。
 - 酒标草稿当前只由 mock filename heuristic 预填，不能代表真实 OCR/AI 识别。
 - 酒标草稿没有持久化 draft/reject 历史；确认后只保留 upload 与 bottle 的关联。
 - 已上传酒标图片暂未在 bottle detail 回看。
-- 当前没有数据库迁移工具；模型变更仍依赖本地开发库重建或后续迁移方案。
 - 前端已完成第一轮页面/组件拆分；`CellarPage`、`AddBottlePage`、`LabelIntakePage` 仍可继续拆成更小的 feature components。
 - `styles.css` 仍是单文件样式表，后续可按 layout/page/component 分段整理。
 - 没有 Excel 导入、模板下载、导入历史和导入回滚。
@@ -76,5 +79,5 @@
 1. 继续细拆 `CellarPage`、`AddBottlePage`、`LabelIntakePage` 内部表单组件，降低单页文件长度。
 2. 为酒标 intake 增加持久化 draft/reject 历史和 bottle detail 图片回看。
 3. 为 CSV 导入补充“下载模板 CSV”和“只显示无效行/有效行”的前端辅助操作。
-4. 为 CSV confirm 增加全局事务边界，避免未来复杂导入时出现部分提交。
-5. 增加数据库迁移方案，至少明确本地 Alpha 到 Beta 的迁移策略。
+4. 为 CSV 导入增加 import batch 记录，追踪一次批量导入的来源、行数和结果。
+5. 增加数据库恢复演练文档和示例数据隔离检查。

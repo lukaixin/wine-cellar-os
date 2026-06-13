@@ -5,6 +5,7 @@
 ## 2026-06-13 新增说明
 
 - 本地数据库迁移已引入 Alembic baseline。剩余风险从“没有迁移工具”转为“旧库 schema 若偏离当前模型，需要专门增量 migration，不应靠删除数据库解决”。
+- CSV confirm 已改为单批次事务提交。剩余导入风险转为“缺少 import batch 历史和人工回滚/撤销流程”，库存 ledger 本身仍保留每瓶 `IN` transaction。
 - Dashboard 酒窖健康分已经可用，但只基于本地库存、位置容量和手工适饮期字段计算；它不能替代专业品鉴、储存检查、价格估值或投资建议。
 
 ## 确认 Bug
@@ -19,7 +20,6 @@
 
 | 优先级 | 问题 | 风险 | 建议处理 |
 | --- | --- | --- | --- |
-| P1 | CSV confirm 复用现有入库服务逐行提交，虽然有预检，但不是全局事务。 | 未来复杂导入出现异常时可能部分提交。 | 增加 batch import transaction boundary，或让 InventoryService 支持外层事务控制。 |
 | P1 | Alembic baseline 已有，但历史偏离 schema 的旧库仍需要专门增量迁移。 | 用户如果跳过备份或直接删除数据库，仍可能丢失 Alpha 数据。 | 后续每次模型变更都必须新增 migration，并在升级前运行 SQLite 备份脚本。 |
 | P2 | 前端部分 page 文件仍较大，尤其 `CellarPage`、`AddBottlePage`、`LabelIntakePage`。 | 后续继续扩展表单和交互时维护成本仍会上升。 | 继续拆分 feature components/forms，并保持现有 smoke test。 |
 | P3 | 前端 `styles.css` 仍是单文件样式表。 | 样式增长后难以定位页面/组件归属。 | 后续按 layout、page、component 分段或拆分样式文件。 |
@@ -33,8 +33,8 @@
 | 优先级 | 限制 | 影响 | 建议处理 |
 | --- | --- | --- | --- |
 | P1 | CSV 导入要求目标酒柜和位置已存在。 | 初次迁移数据前需要先建酒柜位置。 | 增加模板和预检查清单；是否自动创建位置需另行确认。 |
+| P2 | CSV 导入没有 import batch 历史和人工撤销流程。 | 用户难以按批次追踪来源文件、导入行数和后续修正。 | 增加 import batch 记录；撤销应通过 ledger 补偿交易而不是删除原始交易。 |
 | P2 | 不支持 Excel 导入。 | 用户常见库存表可能需要先另存为 CSV。 | 后续增加 xlsx 解析草稿，仍保持确认前不落库。 |
-| P2 | 没有导入历史和回滚。 | 用户难以追踪一次批量导入的来源。 | 增加 import batch 记录，但不能替代库存 ledger。 |
 | P2 | 酒标识别当前只是 mock filename heuristic。 | 只能作为流程演示，不能代表真实识别能力。 | 后续按 `docs/14-label-intake-ai-adapter.md` 接入本地 OCR/AI adapter。 |
 | P2 | 当前价格、适饮期、产区和类型都来自人工录入或 CSV 字段。 | 不代表权威数据。 | 保留来源、置信度和 manual 标记。 |
 | P3 | 没有拖拽式酒柜移动。 | 移动效率有限。 | 等 ledger 和位置规则稳定后再做拖拽。 |

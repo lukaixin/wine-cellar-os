@@ -21,7 +21,7 @@ from app.schemas.common import (
     CsvImportDraftRow,
     CsvImportRow,
 )
-from app.services.inventory_service import InventoryService
+from app.services.inventory_service import BottleCreationResult, InventoryService
 
 REQUIRED_FIELDS = [
     "producer_name",
@@ -120,35 +120,46 @@ class CsvImportService:
         )
 
     def confirm(self, payload: CsvImportConfirmRequest) -> CsvImportConfirmResponse:
-        if not payload.rows:
-            raise HTTPException(status_code=422, detail="No valid CSV import rows to confirm")
+        try:
+            if not payload.rows:
+                raise HTTPException(status_code=422, detail="No valid CSV import rows to confirm")
 
-        resolved: list[tuple[CsvImportRow, Location]] = []
-        errors: list[str] = []
-        for index, row in enumerate(payload.rows, start=1):
-            location, location_errors = self._resolve_location(row.cellar_name, row.location_code)
-            if location_errors:
-                errors.extend(f"row {index}: {error}" for error in location_errors)
-            elif location is not None:
-                resolved.append((row, location))
+            resolved: list[tuple[CsvImportRow, Location]] = []
+            errors: list[str] = []
+            for index, row in enumerate(payload.rows, start=1):
+                location, location_errors = self._resolve_location(row.cellar_name, row.location_code)
+                if location_errors:
+                    errors.extend(f"row {index}: {error}" for error in location_errors)
+                elif location is not None:
+                    resolved.append((row, location))
 
-        errors.extend(self._capacity_errors_for_confirm(resolved))
-        if errors:
-            raise HTTPException(status_code=422, detail="; ".join(errors))
+            errors.extend(self._capacity_errors_for_confirm(resolved))
+            if errors:
+                raise HTTPException(status_code=422, detail="; ".join(errors))
 
-        created_ids: list[str] = []
-        warnings: list[str] = []
-        for row, location in resolved:
-            bottle = self._create_imported_bottle(row, location)
-            created_ids.append(bottle.id)
-            if row.tags:
-                warnings.append(f"tags parsed but not persisted for bottle {bottle.id}")
+            created_ids: list[str] = []
+            transaction_ids: list[str] = []
+            warnings: list[str] = []
+            for row, location in resolved:
+                result = self._create_imported_bottle(row, location)
+                created_ids.append(result.bottle.id)
+                transaction_ids.append(result.transaction.id)
+                if row.tags:
+                    warnings.append(f"tags parsed but not persisted for bottle {result.bottle.id}")
 
-        return CsvImportConfirmResponse(
-            created_bottles=len(created_ids),
-            created_bottle_ids=created_ids,
-            warnings=warnings,
-        )
+            self.session.commit()
+            return CsvImportConfirmResponse(
+                created_bottles=len(created_ids),
+                created_bottle_ids=created_ids,
+                created_transaction_ids=transaction_ids,
+                warnings=warnings,
+            )
+        except HTTPException:
+            self.session.rollback()
+            raise
+        except Exception as exc:
+            self.session.rollback()
+            raise HTTPException(status_code=500, detail=f"CSV import confirm rolled back: {exc}") from exc
 
     def _normalize_row(
         self,
@@ -244,12 +255,12 @@ class CsvImportService:
                 )
         return errors
 
-    def _create_imported_bottle(self, row: CsvImportRow, location: Location) -> Bottle:
+    def _create_imported_bottle(self, row: CsvImportRow, location: Location) -> BottleCreationResult:
         producer = self._get_or_create_producer(row)
         wine = self._get_or_create_wine(row, producer)
         vintage = self._get_or_create_vintage(row, wine)
         self.session.flush()
-        return InventoryService(self.session).create_bottle_with_in_transaction(
+        return InventoryService(self.session).create_bottle_with_in_transaction_result(
             BottleCreate(
                 vintage_id=vintage.id,
                 current_location_id=location.id,
@@ -261,7 +272,8 @@ class CsvImportService:
                 personal_notes=row.notes,
                 actor="csv_import",
                 note="CSV import confirmed",
-            )
+            ),
+            commit=False,
         )
 
     def _get_or_create_producer(self, row: CsvImportRow) -> Producer:

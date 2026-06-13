@@ -198,6 +198,7 @@ export type CsvImportDraft = {
 export type CsvImportConfirmResult = {
   created_bottles: number;
   created_bottle_ids: string[];
+  created_transaction_ids: string[];
   transaction_type: "IN";
   warnings: string[];
 };

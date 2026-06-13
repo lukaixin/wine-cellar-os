@@ -389,6 +389,7 @@ class CsvImportConfirmRequest(BaseModel):
 class CsvImportConfirmResponse(BaseModel):
     created_bottles: int
     created_bottle_ids: list[str]
+    created_transaction_ids: list[str] = Field(default_factory=list)
     transaction_type: Literal["IN"] = "IN"
     warnings: list[str] = Field(default_factory=list)
 

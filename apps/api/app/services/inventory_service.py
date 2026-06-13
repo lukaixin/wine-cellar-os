@@ -16,10 +16,23 @@ OUTBOUND_TRANSACTION_TYPES = {"CONSUME", "GIFT", "DAMAGE"}
 
 
 @dataclass(frozen=True)
+class BottleCreationResult:
+    bottle: Bottle
+    transaction: InventoryTransaction
+
+
+@dataclass(frozen=True)
 class InventoryService:
     session: Session
 
-    def create_bottle_with_in_transaction(self, payload: BottleCreate) -> Bottle:
+    def create_bottle_with_in_transaction(self, payload: BottleCreate, commit: bool = True) -> Bottle:
+        return self.create_bottle_with_in_transaction_result(payload, commit=commit).bottle
+
+    def create_bottle_with_in_transaction_result(
+        self,
+        payload: BottleCreate,
+        commit: bool = True,
+    ) -> BottleCreationResult:
         self._get_vintage(payload.vintage_id)
         to_location = self._get_location(payload.current_location_id)
         self._validate_location_has_capacity(to_location)
@@ -41,16 +54,18 @@ class InventoryService:
         )
         self.session.add(bottle)
         self.session.flush()
-        self._add_transaction(
+        transaction = self._add_transaction(
             bottle=bottle,
             transaction_type="IN",
             to_location_id=to_location.id,
             actor=payload.actor,
             note=payload.note,
         )
-        self.session.commit()
-        self.session.refresh(bottle)
-        return bottle
+        if commit:
+            self.session.commit()
+            self.session.refresh(bottle)
+            self.session.refresh(transaction)
+        return BottleCreationResult(bottle=bottle, transaction=transaction)
 
     def apply_transaction(self, payload: InventoryTransactionCreate) -> InventoryTransaction:
         transaction_type = payload.transaction_type.upper()
