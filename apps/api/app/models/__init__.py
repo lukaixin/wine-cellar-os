@@ -7,6 +7,7 @@ from app.models.label_image import LabelImageUpload
 from app.models.location import Location
 from app.models.media import MediaAsset
 from app.models.producer import Producer
+from app.models.registry import ImportMapping, RegistryAlias, RegistryQualityFinding, RegistryReviewQueue
 from app.models.tag import ObjectTag, Tag
 from app.models.transaction import InventoryTransaction
 from app.models.valuation import ValuationSnapshot
@@ -20,12 +21,16 @@ __all__ = [
     "DrinkWindow",
     "ImportBatch",
     "ImportBatchRow",
+    "ImportMapping",
     "InventoryTransaction",
     "LabelImageUpload",
     "Location",
     "MediaAsset",
     "ObjectTag",
     "Producer",
+    "RegistryAlias",
+    "RegistryQualityFinding",
+    "RegistryReviewQueue",
     "Tag",
     "ValuationSnapshot",
     "Vintage",

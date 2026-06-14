@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UuidPrimaryKeyMixin
@@ -32,6 +33,8 @@ class Vintage(UuidPrimaryKeyMixin, TimestampMixin, Base):
     default_drink_to: Mapped[int | None] = mapped_column(Integer)
     drink_window_confidence: Mapped[str | None] = mapped_column(String(20))
     notes: Mapped[str | None] = mapped_column(Text)
+    quality_status: Mapped[str] = mapped_column(String(30), default="unreviewed", nullable=False, index=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     wine: Mapped["Wine"] = relationship("Wine", back_populates="vintages")
     bottles: Mapped[list["Bottle"]] = relationship("Bottle", back_populates="vintage")

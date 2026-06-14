@@ -224,7 +224,7 @@ export function CsvImportPage({
             }))}
           />
           <DataTable
-            headers={["行", "状态", "Producer", "Wine", "年份", "数量", "位置", "成本", "错误 / 提醒"]}
+            headers={["行", "状态", "Producer", "Wine", "年份", "数量", "匹配分", "Decision", "位置", "成本", "错误 / 提醒"]}
             empty="暂无 WineList 草稿。"
             rows={wineListDraft.rows.map((row) => ({
               key: String(row.row_number),
@@ -235,6 +235,10 @@ export function CsvImportPage({
                 row.normalized?.wine_name ?? String(row.raw.Wine ?? "-"),
                 row.normalized?.vintage_year ?? String(row.raw.Vintage ?? "-"),
                 row.normalized?.quantity ?? String(row.raw.Quantity ?? "-"),
+                row.normalized
+                  ? `${row.normalized.producer_match_score}/${row.normalized.wine_match_score}/${row.normalized.vintage_match_score} (${row.normalized.overall_match_score})`
+                  : "-",
+                row.normalized?.decision ?? "-",
                 row.normalized?.location_label ?? "-",
                 row.normalized?.purchase_price ?? "-",
                 [...row.errors, ...row.warnings].join("; ") || "-",

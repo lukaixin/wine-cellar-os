@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -96,6 +96,73 @@ function makeServer() {
     };
   }
 
+  function collectionSearch(url: URL) {
+    const query = (url.searchParams.get("q") ?? "").trim().toLocaleLowerCase();
+    const producerId = url.searchParams.get("producer_id") ?? "";
+    const vintageYear = url.searchParams.get("vintage_year") ?? "";
+    const locationId = url.searchParams.get("location_id") ?? "";
+    const status = url.searchParams.get("status") ?? "";
+    const limit = Number(url.searchParams.get("limit") ?? 25);
+    const offset = Number(url.searchParams.get("offset") ?? 0);
+    const filtered = state.bottles.filter((bottle) => {
+      const read = bottleRead(bottle);
+      const haystack = [
+        read.producer_name,
+        read.producer_name_cn,
+        read.wine_name,
+        read.wine_name_cn,
+        read.vintage_year,
+        read.is_non_vintage ? "NV" : "",
+      ].filter(Boolean).join(" ").toLocaleLowerCase();
+      const producer = state.producers.find((item) => item.name_original === read.producer_name);
+      if (query && !haystack.includes(query)) return false;
+      if (producerId && producer?.id !== producerId) return false;
+      if (vintageYear && String(read.vintage_year ?? "") !== vintageYear) return false;
+      if (locationId && bottle.current_location_id !== locationId) return false;
+      if (status && bottle.current_status !== status) return false;
+      return true;
+    });
+    const groups = new Map<string, Entity[]>();
+    for (const bottle of filtered) {
+      groups.set(`${bottle.vintage_id}:${bottle.current_location_id ?? ""}:${bottle.current_status}`, [
+        ...(groups.get(`${bottle.vintage_id}:${bottle.current_location_id ?? ""}:${bottle.current_status}`) ?? []),
+        bottle,
+      ]);
+    }
+    const items = Array.from(groups.values()).map((group) => {
+      const first = bottleRead(group[0]);
+      const wine = state.wines.find((item) => item.name_original === first.wine_name);
+      const producer = state.producers.find((item) => item.name_original === first.producer_name);
+      return {
+        bottle_id: first.id,
+        bottle_ids: group.map((item) => item.id),
+        producer_id: producer?.id ?? null,
+        producer_name: first.producer_name,
+        producer_name_cn: first.producer_name_cn,
+        wine_id: wine?.id ?? null,
+        wine_name: first.wine_name,
+        wine_name_cn: first.wine_name_cn,
+        vintage_id: first.vintage_id,
+        vintage_year: first.vintage_year,
+        is_non_vintage: first.is_non_vintage,
+        bottle_count: group.length,
+        location: {
+          id: first.current_location_id,
+          cellar_name: first.cellar_name,
+          code: first.location_code,
+        },
+        status: first.current_status,
+      };
+    });
+    return {
+      query: query || null,
+      total: items.length,
+      limit,
+      offset,
+      items: items.slice(offset, offset + limit),
+    };
+  }
+
   function addTransaction(values: Entity) {
     const transaction = {
       id: nextId("txn"),
@@ -106,6 +173,46 @@ function makeServer() {
     };
     state.transactions.push(transaction);
     return transactionRead(transaction);
+  }
+
+  function applyInventoryAction(transactionType: "CONSUME" | "GIFT" | "DAMAGE" | "MOVE", body: Entity) {
+    const bottle = state.bottles.find((item) => item.id === body.bottle_id);
+    if (!bottle) return json({ detail: "Bottle not found" }, 404);
+    if (bottle.current_status !== "in_stock") {
+      return json({ detail: `Cannot create ${transactionType}: bottle is already unavailable with status ${bottle.current_status}` }, 409);
+    }
+    if (transactionType !== "MOVE" && body.quantity !== 1) {
+      return json({ detail: "quantity must be 1 because each Bottle record represents one physical bottle" }, 422);
+    }
+    const fromLocationId = transactionType === "MOVE" ? body.from_location : bottle.current_location_id ?? null;
+    if (transactionType === "MOVE") {
+      if (fromLocationId !== bottle.current_location_id) return json({ detail: "from_location_id must match bottle current_location_id" }, 409);
+      if (!state.locations.some((location) => location.id === body.to_location)) return json({ detail: "Location not found" }, 404);
+      bottle.current_location_id = body.to_location;
+    }
+    if (transactionType === "CONSUME") {
+      bottle.current_status = "drunk";
+      bottle.current_location_id = null;
+    }
+    if (transactionType === "GIFT") {
+      bottle.current_status = "gifted";
+      bottle.current_location_id = null;
+    }
+    if (transactionType === "DAMAGE") {
+      bottle.current_status = "damaged";
+      bottle.current_location_id = null;
+    }
+    return json(
+      addTransaction({
+        bottle_id: bottle.id,
+        transaction_type: transactionType,
+        from_location_id: fromLocationId,
+        to_location_id: transactionType === "MOVE" ? body.to_location : null,
+        reason: transactionType === "GIFT" ? `Recipient: ${body.recipient}` : transactionType === "DAMAGE" ? body.reason : null,
+        note: body.notes ?? null,
+      }),
+      201,
+    );
   }
 
   const importBatchDetail = {
@@ -148,6 +255,202 @@ function makeServer() {
         ledger_transaction_ids: [],
       },
     ],
+  };
+  const registryFindings = [
+    {
+      id: "finding-1",
+      finding_type: "missing_region",
+      severity: "low",
+      entity_type: "producer",
+      entity_id: "producer-qa",
+      evidence: { producer: "QA Estate" },
+      evidence_hash: "f".repeat(64),
+      suggested_action: "补充产区，无法确认时保持 manual/low confidence。",
+      status: "open",
+      created_at: new Date(2026, 5, 13, 9, 15).toISOString(),
+    },
+  ];
+  const registryReviewQueue = [
+    {
+      id: "review-1",
+      review_type: "match_range",
+      status: "open",
+      source: "winelist:Stock",
+      entity_type: "producer",
+      entity_id: "producer-qa",
+      import_mapping_id: "mapping-1",
+      raw_value: { field: "Producer", value: "Sample Est." },
+      match_score: 88,
+      title: "WineList row 2 needs registry review",
+      detail: "Producer matched at 88; review before treating it as stable.",
+      evidence: { candidate_key: "sample estate" },
+      created_at: new Date(2026, 5, 13, 9, 16).toISOString(),
+    },
+  ];
+  const registryAliases = [
+    {
+      id: "alias-1",
+      entity_type: "producer",
+      entity_id: "producer-qa",
+      alias_text: "Sample Est.",
+      alias_key: "sample est",
+      status: "candidate",
+      source: "winelist:Stock",
+      rule_version: "registry-v1",
+      confidence: "low",
+      import_mapping_id: "mapping-1",
+      reviewed_at: null,
+      note: null,
+      created_at: new Date(2026, 5, 13, 9, 17).toISOString(),
+      updated_at: new Date(2026, 5, 13, 9, 17).toISOString(),
+    },
+  ];
+  const registryImportMappings = [
+    {
+      id: "mapping-1",
+      source: "winelist:Stock",
+      import_batch_id: "batch-1",
+      import_batch_row_id: "row-1",
+      source_row_number: 2,
+      raw_value: { field: "Producer", value: "Sample Est." },
+      target_entity_type: "producer",
+      target_entity_id: "producer-qa",
+      match_score: 88,
+      decision: "needs_review",
+      rule_version: "registry-v1",
+      evidence: { matched_by: "fuzzy_key" },
+      created_at: new Date(2026, 5, 13, 9, 18).toISOString(),
+    },
+  ];
+  const registrySearch = {
+    query: "drc",
+    producers: [
+      {
+        id: "producer-drc",
+        entity_type: "producer",
+        display_name: "Domaine de la Romanee-Conti",
+        matched_text: "DRC",
+        matched_by: "alias",
+        score: 96,
+        quality_status: "approved",
+      },
+    ],
+    wines: [
+      {
+        id: "wine-rc",
+        entity_type: "wine",
+        display_name: "Domaine de la Romanee-Conti · Romanee-Conti Grand Cru",
+        matched_text: "罗曼尼康帝",
+        matched_by: "chinese_name",
+        score: 92,
+        quality_status: "unreviewed",
+      },
+    ],
+    vintages: [
+      {
+        id: "vintage-rc",
+        entity_type: "vintage",
+        display_name: "Domaine de la Romanee-Conti · Romanee-Conti Grand Cru · 2020",
+        matched_text: "Romanee Conti",
+        matched_by: "fuzzy",
+        score: 88,
+        quality_status: "unreviewed",
+      },
+    ],
+  };
+  const registryDiscovery = {
+    recent_producers: [
+      {
+        id: "producer-drc",
+        entity_type: "producer",
+        display_name: "Domaine de la Romanee-Conti",
+        created_at: new Date(2026, 5, 13, 9, 20).toISOString(),
+        quality_status: "approved",
+      },
+    ],
+    recent_wines: [
+      {
+        id: "wine-rc",
+        entity_type: "wine",
+        display_name: "Domaine de la Romanee-Conti · Romanee-Conti Grand Cru",
+        created_at: new Date(2026, 5, 13, 9, 21).toISOString(),
+        quality_status: "unreviewed",
+      },
+    ],
+    recent_vintages: [
+      {
+        id: "vintage-rc",
+        entity_type: "vintage",
+        display_name: "Domaine de la Romanee-Conti · Romanee-Conti Grand Cru · 2020",
+        created_at: new Date(2026, 5, 13, 9, 22).toISOString(),
+        quality_status: "unreviewed",
+      },
+    ],
+    quality_risks: [
+      {
+        id: "risk-1",
+        finding_type: "duplicate_producer",
+        severity: "high",
+        entity_type: "producer",
+        entity_id: "producer-drc",
+        suggested_action: "人工确认是否需要设置 merged_into_id；不要自动合并历史数据。",
+        evidence: { canonical_key: "domaine de la romanee conti" },
+        created_at: new Date(2026, 5, 13, 9, 23).toISOString(),
+      },
+    ],
+  };
+  const registryDetails: Record<string, Entity> = {
+    "/registry/producers/producer-drc": {
+      id: "producer-drc",
+      entity_type: "producer",
+      canonical_name: "Domaine de la Romanee-Conti",
+      name_cn: "罗曼尼康帝",
+      aliases: ["DRC"],
+      country: "France",
+      region: "Bourgogne",
+      wine_count: 1,
+      quality_status: "approved",
+      canonical_key: "domaine de la romanee conti",
+    },
+    "/registry/wines/wine-rc": {
+      id: "wine-rc",
+      entity_type: "wine",
+      canonical_name: "Romanee-Conti Grand Cru",
+      name_cn: "罗曼尼康帝特级园",
+      producer_id: "producer-drc",
+      producer_name: "Domaine de la Romanee-Conti",
+      aliases: ["Romanee Conti"],
+      vintage_count: 1,
+      quality_status: "unreviewed",
+      wine_identity_key: "domaine de la romanee conti | romanee conti grand cru | france | bourgogne | red",
+    },
+    "/registry/vintages/vintage-rc": {
+      id: "vintage-rc",
+      entity_type: "vintage",
+      producer_id: "producer-drc",
+      producer_name: "Domaine de la Romanee-Conti",
+      wine_id: "wine-rc",
+      wine_name: "Romanee-Conti Grand Cru",
+      vintage_year: 2020,
+      is_non_vintage: false,
+      bottle_count: 2,
+      default_drink_from: 2030,
+      default_drink_to: 2050,
+      drink_window_confidence: "low",
+      drink_windows: [
+        {
+          source: "manual",
+          source_detail: "QA",
+          drink_from: 2030,
+          drink_to: 2050,
+          peak_from: null,
+          peak_to: null,
+          confidence: "low",
+          notes: "人工录入",
+        },
+      ],
+      quality_status: "unreviewed",
+    },
   };
 
   function dashboardSummary() {
@@ -238,6 +541,65 @@ function makeServer() {
     if (method === "GET" && url.pathname === "/api/cellars") return json(state.cellars);
     if (method === "GET" && url.pathname === "/api/locations") return json(state.locations.map(locationRead));
     if (method === "GET" && url.pathname === "/api/bottles") return json(state.bottles.map(bottleRead));
+    if (method === "GET" && url.pathname === "/collection/search") return json(collectionSearch(url));
+    const collectionBottleMatch = url.pathname.match(/^\/collection\/bottles\/([^/]+)$/);
+    if (method === "GET" && collectionBottleMatch) {
+      const bottle = state.bottles.find((item) => item.id === collectionBottleMatch[1]);
+      if (!bottle) return json({ detail: "Bottle not found" }, 404);
+      const read = bottleRead(bottle);
+      const wine = state.wines.find((item) => item.name_original === read.wine_name);
+      const producer = state.producers.find((item) => item.name_original === read.producer_name);
+      return json({
+        id: read.id,
+        bottle_id: read.id,
+        bottle_size_ml: read.bottle_size_ml,
+        quantity: 1,
+        status: read.current_status,
+        acquisition_date: read.acquisition_date ?? null,
+        vintage_id: read.vintage_id,
+        vintage_year: read.vintage_year,
+        is_non_vintage: read.is_non_vintage,
+        wine_id: wine?.id ?? null,
+        wine_name: read.wine_name,
+        wine_name_cn: read.wine_name_cn,
+        producer_id: producer?.id ?? null,
+        producer_name: read.producer_name,
+        producer_name_cn: read.producer_name_cn,
+        location: {
+          id: read.current_location_id,
+          cellar_name: read.cellar_name,
+          code: read.location_code,
+        },
+        created_at: read.created_at ?? new Date(2026, 5, 13, 12, 0).toISOString(),
+        updated_at: read.updated_at ?? new Date(2026, 5, 13, 12, 0).toISOString(),
+      });
+    }
+    const collectionTimelineMatch = url.pathname.match(/^\/collection\/bottles\/([^/]+)\/timeline$/);
+    if (method === "GET" && collectionTimelineMatch) {
+      const bottle = state.bottles.find((item) => item.id === collectionTimelineMatch[1]);
+      if (!bottle) return json({ detail: "Bottle not found" }, 404);
+      const events = state.transactions
+        .filter((transaction) => transaction.bottle_id === bottle.id)
+        .slice()
+        .sort((a, b) => String(b.occurred_at).localeCompare(String(a.occurred_at)))
+        .map((transaction) => {
+          const from = state.locations.find((item) => item.id === transaction.from_location_id);
+          const to = state.locations.find((item) => item.id === transaction.to_location_id);
+          const fromCellar = state.cellars.find((item) => item.id === from?.cellar_id);
+          const toCellar = state.cellars.find((item) => item.id === to?.cellar_id);
+          return {
+            event_type: transaction.transaction_type,
+            event_time: transaction.occurred_at,
+            quantity_delta: transaction.transaction_type === "IN" ? 1 : ["CONSUME", "GIFT", "DAMAGE"].includes(transaction.transaction_type) ? -1 : 0,
+            reference_type: "inventory_transaction",
+            reference_id: transaction.id,
+            from_location: from ? { id: from.id, cellar_name: fromCellar?.name ?? null, code: from.code } : { id: null, cellar_name: null, code: null },
+            to_location: to ? { id: to.id, cellar_name: toCellar?.name ?? null, code: to.code } : { id: null, cellar_name: null, code: null },
+            notes: transaction.note ?? transaction.reason ?? null,
+          };
+        });
+      return json(events);
+    }
     if (method === "GET" && url.pathname === "/api/inventory-transactions") return json(state.transactions.map(transactionRead));
     if (method === "GET" && url.pathname === "/imports/batches") {
       return json({
@@ -261,6 +623,13 @@ function makeServer() {
       });
     }
     if (method === "GET" && url.pathname === "/imports/batches/batch-1") return json(importBatchDetail);
+    if (method === "GET" && url.pathname === "/registry/quality/findings") return json(registryFindings);
+    if (method === "GET" && url.pathname === "/registry/review-queue") return json(registryReviewQueue);
+    if (method === "GET" && url.pathname === "/registry/aliases") return json(registryAliases);
+    if (method === "GET" && url.pathname === "/registry/import-mappings") return json(registryImportMappings);
+    if (method === "GET" && url.pathname === "/registry/search") return json({ ...registrySearch, query: url.searchParams.get("q") ?? "" });
+    if (method === "GET" && url.pathname === "/registry/discovery") return json(registryDiscovery);
+    if (method === "GET" && registryDetails[url.pathname]) return json(registryDetails[url.pathname]);
 
     if (method === "POST" && url.pathname === "/api/intake/label-images") {
       const uploadedFile = body instanceof FormData ? (body.get("file") as File | null) : null;
@@ -439,6 +808,11 @@ function makeServer() {
               location_code: "C",
               location_label: "家中酒柜 / C",
               location_key: "CAVE_C",
+              producer_match_score: 100,
+              wine_match_score: 100,
+              vintage_match_score: 100,
+              overall_match_score: 100,
+              decision: "auto_accepted",
             },
             errors: [],
             warnings: [],
@@ -522,6 +896,18 @@ function makeServer() {
       });
       return json(bottleRead(bottle), 201);
     }
+    if (method === "POST" && url.pathname === "/inventory/actions/consume") {
+      return applyInventoryAction("CONSUME", body);
+    }
+    if (method === "POST" && url.pathname === "/inventory/actions/gift") {
+      return applyInventoryAction("GIFT", body);
+    }
+    if (method === "POST" && url.pathname === "/inventory/actions/damage") {
+      return applyInventoryAction("DAMAGE", body);
+    }
+    if (method === "POST" && url.pathname === "/inventory/actions/move") {
+      return applyInventoryAction("MOVE", body);
+    }
     if (method === "POST" && url.pathname === "/api/inventory-transactions") {
       const bottle = state.bottles.find((item) => item.id === body.bottle_id);
       if (!bottle) return json({ detail: "Bottle not found" }, 404);
@@ -562,6 +948,7 @@ describe("Alpha UI smoke", () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.unstubAllGlobals();
   });
 
@@ -590,6 +977,32 @@ describe("Alpha UI smoke", () => {
     expect(screen.getByText("Vintage must be a year: bad")).toBeTruthy();
     expect(screen.getByText(/bottle-winelist-1/)).toBeTruthy();
     expect(screen.getByText(/txn-winelist-1/)).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Registry Quality" }));
+    await waitFor(() => expect(screen.getAllByText("Findings").length).toBeGreaterThan(0));
+    expect(screen.getAllByText("Review Queue").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Alias").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Import Mapping").length).toBeGreaterThan(0);
+    expect(screen.getByText("missing_region")).toBeTruthy();
+    expect(screen.getByText("needs_review")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Registry Search" }));
+    await screen.findByText("Discovery");
+    expect(screen.getAllByText("Domaine de la Romanee-Conti").length).toBeGreaterThan(0);
+    expect(screen.getByText("duplicate_producer")).toBeTruthy();
+    await user.type(screen.getByLabelText("Registry 查询"), "drc");
+    await user.click(screen.getByRole("button", { name: "搜索" }));
+    await screen.findByText("Search Results");
+    expect(screen.getByText("Producer Results")).toBeTruthy();
+    expect(screen.getByText("Vintage Results")).toBeTruthy();
+    expect(screen.getByText("Alias")).toBeTruthy();
+    expect(screen.getByText("Fuzzy")).toBeTruthy();
+    await user.click(screen.getAllByText("Domaine de la Romanee-Conti")[0]);
+    await screen.findByText("Wine Count");
+    expect(screen.getByText("Bourgogne")).toBeTruthy();
+    expect(screen.getAllByText("DRC").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "库存导入" }));
 
     const file = new File(
       [
@@ -670,6 +1083,25 @@ describe("Alpha UI smoke", () => {
     expect(screen.getByText("QA柜 / A-01-02")).toBeTruthy();
     expect(screen.getByText("从 A-01-01 / 到 A-01-02")).toBeTruthy();
 
+    await user.click(screen.getByRole("button", { name: "Collection Explorer" }));
+    await screen.findByText("Result List");
+    await user.type(screen.getByLabelText("Collection Search"), "QA");
+    await user.selectOptions(screen.getByLabelText("Location"), server.state.locations[1].id);
+    await user.selectOptions(screen.getByLabelText("Status"), "in_stock");
+    await user.click(screen.getByRole("button", { name: "搜索" }));
+    await screen.findByText("QA正牌");
+    expect(screen.getAllByText("QA柜 / A-01-02").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("在库").length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: /展开 1 Bottles/ }));
+    await screen.findByRole("button", { name: /Bottle #1/ });
+    await user.click(screen.getByRole("button", { name: /Bottle #1/ }));
+    await screen.findByText("Bottle Size");
+    expect(screen.getByText("Acquisition Date")).toBeTruthy();
+    expect(screen.getAllByText("2026-06-13").length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: "Timeline" }));
+    await screen.findByText("移动到第二格");
+    expect(screen.getAllByText("移动").length).toBeGreaterThan(0);
+
     await user.click(screen.getByRole("button", { name: "酒柜地图" }));
     expect(screen.getByText("占用 1/1")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "QA正牌" }));
@@ -696,4 +1128,71 @@ describe("Alpha UI smoke", () => {
     expect(screen.getByText("适饮状态")).toBeTruthy();
     expect(screen.getByText("1/6 已占用，5 空位")).toBeTruthy();
   }, 15000);
+
+  it("submits Collection Explorer actions and refreshes the timeline", async () => {
+    const user = userEvent.setup();
+    server.state.cellars.push({ id: "cellar-action", name: "Action柜", cellar_type: "cabinet" });
+    server.state.locations.push(
+      { id: "loc-action-1", cellar_id: "cellar-action", code: "A-01-01", capacity: 2, location_type: "grid" },
+      { id: "loc-action-2", cellar_id: "cellar-action", code: "A-01-02", capacity: 2, location_type: "grid" },
+    );
+    server.state.producers.push({ id: "producer-action", name_original: "Action Estate", name_cn: "行动酒庄" });
+    server.state.wines.push({
+      id: "wine-action",
+      producer_id: "producer-action",
+      name_original: "Action Red",
+      name_cn: "行动红",
+      type: "red",
+      country: "France",
+    });
+    server.state.vintages.push({ id: "vintage-action", wine_id: "wine-action", vintage_year: 2020, is_non_vintage: false });
+    server.state.bottles.push({
+      id: "bottle-action",
+      vintage_id: "vintage-action",
+      current_status: "in_stock",
+      current_location_id: "loc-action-1",
+      bottle_size_ml: 750,
+      acquisition_date: "2026-06-14",
+      purchase_currency: "CNY",
+    });
+    server.state.transactions.push({
+      id: "txn-action-in",
+      bottle_id: "bottle-action",
+      transaction_type: "IN",
+      from_location_id: null,
+      to_location_id: "loc-action-1",
+      occurred_at: new Date(2026, 5, 14, 8, 0).toISOString(),
+      actor: "qa",
+      reason: null,
+      note: "seed",
+    });
+
+    render(<App />);
+
+    await screen.findByRole("heading", { name: "Dashboard" });
+    await user.click(screen.getByRole("button", { name: "Collection Explorer" }));
+    await screen.findByText("Result List");
+    await user.type(screen.getByLabelText("Collection Search"), "Action");
+    await user.click(screen.getByRole("button", { name: "搜索" }));
+    await screen.findByText("行动红");
+    await user.click(screen.getByRole("button", { name: /展开 1 Bottles/ }));
+    await user.click(screen.getByRole("button", { name: /Bottle #1/ }));
+    await screen.findByText("Bottle Size");
+
+    await user.click(screen.getByRole("button", { name: "Actions" }));
+    await user.clear(screen.getByLabelText("Quantity"));
+    await user.type(screen.getByLabelText("Quantity"), "2");
+    await user.type(screen.getByLabelText("Notes"), "Weekend dinner");
+    await user.click(screen.getByRole("button", { name: "确认饮用" }));
+    await screen.findByText("单瓶操作数量必须为 1。");
+
+    await user.clear(screen.getByLabelText("Quantity"));
+    await user.type(screen.getByLabelText("Quantity"), "1");
+    await user.click(screen.getByRole("button", { name: "确认饮用" }));
+
+    await screen.findByText("饮用已记录");
+    await screen.findByText("Weekend dinner");
+    expect(screen.getAllByText("已饮用").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("饮用").length).toBeGreaterThan(0);
+  }, 10000);
 });

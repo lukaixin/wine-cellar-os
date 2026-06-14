@@ -32,6 +32,10 @@ country text nullable
 region text nullable
 website text nullable
 aliases json/text nullable
+canonical_key text nullable
+quality_status text default 'unreviewed'
+merged_into_id uuid/text nullable
+reviewed_at datetime nullable
 created_at datetime
 updated_at datetime
 ```
@@ -52,6 +56,10 @@ grape_varieties json/text nullable
 classification text nullable
 lwin7 text nullable
 aliases json/text nullable
+wine_identity_key text nullable
+quality_status text default 'unreviewed'
+merged_into_id uuid/text nullable
+reviewed_at datetime nullable
 created_at datetime
 updated_at datetime
 ```
@@ -70,9 +78,87 @@ default_drink_from integer nullable
 default_drink_to integer nullable
 drink_window_confidence text nullable # low/medium/high
 notes text nullable
+quality_status text default 'unreviewed'
+reviewed_at datetime nullable
 created_at datetime
 updated_at datetime
 unique(wine_id, vintage_year, is_non_vintage)
+```
+
+### registry_aliases
+
+Registry alias 不等于合并；只有 `approved` alias 可以用于稳定匹配。
+
+```text
+id uuid pk
+entity_type text not null        # producer/wine/vintage
+entity_id uuid/text not null
+alias_text text not null
+alias_key text not null
+status text not null             # observed/candidate/approved/rejected/conflict
+source text nullable
+rule_version text default 'registry-v1'
+confidence text nullable
+import_mapping_id uuid/text nullable
+reviewed_at datetime nullable
+note text nullable
+created_at datetime
+updated_at datetime
+```
+
+### import_mappings
+
+记录导入阶段的匹配过程，不直接改变正式库存。
+
+```text
+id uuid pk
+source text not null
+import_batch_id uuid/text nullable
+import_batch_row_id uuid/text nullable
+source_row_number integer nullable
+raw_value json nullable
+target_entity_type text not null  # producer/wine/vintage
+target_entity_id uuid/text nullable
+match_score integer not null      # 0-100
+decision text not null            # auto_accepted/needs_review/manual_required/rejected
+rule_version text default 'registry-v1'
+evidence json nullable
+created_at datetime
+```
+
+### registry_review_queue
+
+本轮只做观察和验收，不实现审批流。
+
+```text
+id uuid pk
+review_type text not null         # match_range/alias_conflict/suspected_duplicate/missing_field
+status text default 'open'
+source text nullable
+entity_type text nullable
+entity_id uuid/text nullable
+import_mapping_id uuid/text nullable
+raw_value json nullable
+match_score integer nullable
+title text not null
+detail text nullable
+evidence json nullable
+created_at datetime
+```
+
+### registry_quality_findings
+
+```text
+id uuid pk
+finding_type text not null        # duplicate_producer/duplicate_wine/alias_conflict/missing_vintage/missing_drink_window/missing_region/missing_country
+severity text not null            # low/medium/high
+entity_type text nullable
+entity_id uuid/text nullable
+evidence json not null
+evidence_hash text not null
+suggested_action text not null
+status text default 'open'
+created_at datetime
 ```
 
 ### cellars

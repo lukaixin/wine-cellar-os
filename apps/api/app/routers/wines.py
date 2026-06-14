@@ -6,6 +6,7 @@ from app.core.database import get_session
 from app.models import Producer, Wine
 from app.routers.helpers import apply_update, commit_or_400, get_or_404, wine_to_read
 from app.schemas.common import WineCreate, WineRead, WineUpdate
+from app.services.registry_service import RegistryService
 
 router = APIRouter(prefix="/api/wines", tags=["wines"])
 
@@ -18,8 +19,9 @@ def list_wines(session: Session = Depends(get_session)) -> list[dict]:
 
 @router.post("", response_model=WineRead, status_code=201)
 def create_wine(payload: WineCreate, session: Session = Depends(get_session)) -> dict:
-    get_or_404(session, Producer, payload.producer_id, "Producer")
+    producer = get_or_404(session, Producer, payload.producer_id, "Producer")
     wine = Wine(**payload.model_dump())
+    RegistryService(session).apply_wine_fields(wine, producer)
     session.add(wine)
     commit_or_400(session)
     wine = session.scalars(
@@ -55,6 +57,7 @@ def update_wine(wine_id: str, payload: WineUpdate, session: Session = Depends(ge
     if "producer_id" in values:
         get_or_404(session, Producer, values["producer_id"], "Producer")
     apply_update(wine, values)
+    RegistryService(session).apply_wine_fields(wine)
     commit_or_400(session)
     wine = session.scalars(select(Wine).options(joinedload(Wine.producer)).where(Wine.id == wine.id)).one()
     return wine_to_read(wine)

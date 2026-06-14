@@ -31,10 +31,17 @@ class ProducerUpdate(BaseModel):
     region: str | None = None
     website: str | None = None
     aliases: list[str] | dict[str, Any] | None = None
+    quality_status: str | None = None
+    merged_into_id: str | None = None
+    reviewed_at: datetime | None = None
 
 
 class ProducerRead(ProducerBase, OrmModel):
     id: str
+    canonical_key: str | None = None
+    quality_status: str = "unreviewed"
+    merged_into_id: str | None = None
+    reviewed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -71,10 +78,17 @@ class WineUpdate(BaseModel):
     classification: str | None = None
     lwin7: str | None = None
     aliases: list[str] | dict[str, Any] | None = None
+    quality_status: str | None = None
+    merged_into_id: str | None = None
+    reviewed_at: datetime | None = None
 
 
 class WineRead(WineBase, OrmModel):
     id: str
+    wine_identity_key: str | None = None
+    quality_status: str = "unreviewed"
+    merged_into_id: str | None = None
+    reviewed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     producer_name: str | None = None
@@ -108,10 +122,14 @@ class VintageUpdate(BaseModel):
     default_drink_to: int | None = None
     drink_window_confidence: str | None = None
     notes: str | None = None
+    quality_status: str | None = None
+    reviewed_at: datetime | None = None
 
 
 class VintageRead(VintageBase, OrmModel):
     id: str
+    quality_status: str = "unreviewed"
+    reviewed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     wine_name: str | None = None
@@ -255,6 +273,69 @@ class BottleRead(OrmModel):
     location_code: str | None = None
 
 
+class CollectionLocationRead(BaseModel):
+    id: str | None = None
+    cellar_name: str | None = None
+    code: str | None = None
+
+
+class CollectionSearchItem(BaseModel):
+    bottle_id: str
+    bottle_ids: list[str]
+    producer_id: str | None = None
+    producer_name: str | None = None
+    producer_name_cn: str | None = None
+    wine_id: str | None = None
+    wine_name: str | None = None
+    wine_name_cn: str | None = None
+    vintage_id: str
+    vintage_year: int | None = None
+    is_non_vintage: bool
+    bottle_count: int
+    location: CollectionLocationRead
+    status: str
+
+
+class CollectionSearchResponse(BaseModel):
+    query: str | None = None
+    total: int
+    limit: int
+    offset: int
+    items: list[CollectionSearchItem]
+
+
+class CollectionBottleDetail(BaseModel):
+    id: str
+    bottle_id: str
+    bottle_size_ml: int
+    quantity: int = 1
+    status: str
+    acquisition_date: date | None = None
+    vintage_id: str
+    vintage_year: int | None = None
+    is_non_vintage: bool
+    wine_id: str | None = None
+    wine_name: str | None = None
+    wine_name_cn: str | None = None
+    producer_id: str | None = None
+    producer_name: str | None = None
+    producer_name_cn: str | None = None
+    location: CollectionLocationRead
+    created_at: datetime
+    updated_at: datetime
+
+
+class CollectionBottleTimelineEvent(BaseModel):
+    event_type: str
+    event_time: datetime
+    quantity_delta: int
+    reference_type: Literal["inventory_transaction"]
+    reference_id: str
+    from_location: CollectionLocationRead
+    to_location: CollectionLocationRead
+    notes: str | None = None
+
+
 class InventoryTransactionCreate(BaseModel):
     bottle_id: str
     transaction_type: str
@@ -264,6 +345,31 @@ class InventoryTransactionCreate(BaseModel):
     reason: str | None = None
     note: str | None = None
     occurred_at: datetime | None = None
+
+
+class InventoryActionQuantity(BaseModel):
+    bottle_id: str
+    quantity: int = Field(gt=0)
+    notes: str | None = None
+
+
+class ConsumeBottleAction(InventoryActionQuantity):
+    pass
+
+
+class GiftBottleAction(InventoryActionQuantity):
+    recipient: str = Field(min_length=1)
+
+
+class DamageBottleAction(InventoryActionQuantity):
+    reason: str = Field(min_length=1)
+
+
+class MoveBottleAction(BaseModel):
+    bottle_id: str
+    from_location: str
+    to_location: str
+    notes: str | None = None
 
 
 class InventoryTransactionRead(OrmModel):
@@ -414,6 +520,11 @@ class WineListImportNormalizedRow(BaseModel):
     location_key: str
     raw_status: str | None = None
     raw_cave: str | None = None
+    producer_match_score: int = Field(default=100, ge=0, le=100)
+    wine_match_score: int = Field(default=100, ge=0, le=100)
+    vintage_match_score: int = Field(default=100, ge=0, le=100)
+    overall_match_score: int = Field(default=100, ge=0, le=100)
+    decision: Literal["auto_accepted", "needs_review", "manual_required", "rejected"] = "auto_accepted"
 
 
 class WineListImportDraftRow(BaseModel):
@@ -509,6 +620,168 @@ class ImportBatchDetailResponse(BaseModel):
     created_bottle_count: int
     warnings: list[str] = Field(default_factory=list)
     rows: list[ImportBatchDetailRow]
+
+
+class RegistryAliasRead(OrmModel):
+    id: str
+    entity_type: str
+    entity_id: str
+    alias_text: str
+    alias_key: str
+    status: str
+    source: str | None = None
+    rule_version: str
+    confidence: str | None = None
+    import_mapping_id: str | None = None
+    reviewed_at: datetime | None = None
+    note: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ImportMappingRead(OrmModel):
+    id: str
+    source: str
+    import_batch_id: str | None = None
+    import_batch_row_id: str | None = None
+    source_row_number: int | None = None
+    raw_value: dict[str, Any] | str | None = None
+    target_entity_type: str
+    target_entity_id: str | None = None
+    match_score: int
+    decision: str
+    rule_version: str
+    evidence: dict[str, Any] | list[Any] | None = None
+    created_at: datetime
+
+
+class RegistryReviewQueueRead(OrmModel):
+    id: str
+    review_type: str
+    status: str
+    source: str | None = None
+    entity_type: str | None = None
+    entity_id: str | None = None
+    import_mapping_id: str | None = None
+    raw_value: dict[str, Any] | str | None = None
+    match_score: int | None = None
+    title: str
+    detail: str | None = None
+    evidence: dict[str, Any] | list[Any] | None = None
+    created_at: datetime
+
+
+class RegistryQualityFindingRead(OrmModel):
+    id: str
+    finding_type: str
+    severity: str
+    entity_type: str | None = None
+    entity_id: str | None = None
+    evidence: dict[str, Any] | list[Any]
+    evidence_hash: str
+    suggested_action: str
+    status: str
+    created_at: datetime
+
+
+RegistryEntityType = Literal["producer", "wine", "vintage"]
+
+
+class RegistrySearchResult(BaseModel):
+    id: str
+    entity_type: RegistryEntityType
+    display_name: str
+    matched_text: str
+    matched_by: str
+    score: int = Field(ge=0, le=100)
+    quality_status: str
+
+
+class RegistrySearchResponse(BaseModel):
+    query: str
+    producers: list[RegistrySearchResult]
+    wines: list[RegistrySearchResult]
+    vintages: list[RegistrySearchResult]
+
+
+class RegistryProducerDetail(BaseModel):
+    id: str
+    entity_type: Literal["producer"] = "producer"
+    canonical_name: str
+    name_cn: str | None = None
+    aliases: list[str] = Field(default_factory=list)
+    country: str | None = None
+    region: str | None = None
+    wine_count: int
+    quality_status: str
+    canonical_key: str | None = None
+
+
+class RegistryWineDetail(BaseModel):
+    id: str
+    entity_type: Literal["wine"] = "wine"
+    canonical_name: str
+    name_cn: str | None = None
+    producer_id: str
+    producer_name: str
+    aliases: list[str] = Field(default_factory=list)
+    vintage_count: int
+    quality_status: str
+    wine_identity_key: str | None = None
+
+
+class RegistryDrinkWindowRead(BaseModel):
+    source: str
+    source_detail: str | None = None
+    drink_from: int | None = None
+    drink_to: int | None = None
+    peak_from: int | None = None
+    peak_to: int | None = None
+    confidence: str
+    notes: str | None = None
+
+
+class RegistryVintageDetail(BaseModel):
+    id: str
+    entity_type: Literal["vintage"] = "vintage"
+    producer_id: str
+    producer_name: str
+    wine_id: str
+    wine_name: str
+    vintage_year: int | None = None
+    is_non_vintage: bool
+    bottle_count: int
+    default_drink_from: int | None = None
+    default_drink_to: int | None = None
+    drink_window_confidence: str | None = None
+    drink_windows: list[RegistryDrinkWindowRead] = Field(default_factory=list)
+    quality_status: str
+
+
+class RegistryDiscoveryItem(BaseModel):
+    id: str
+    entity_type: RegistryEntityType
+    display_name: str
+    created_at: datetime
+    quality_status: str
+
+
+class RegistryQualityRisk(BaseModel):
+    id: str
+    finding_type: str
+    severity: str
+    entity_type: str | None = None
+    entity_id: str | None = None
+    suggested_action: str
+    evidence: dict[str, Any] | list[Any]
+    created_at: datetime
+
+
+class RegistryDiscoveryResponse(BaseModel):
+    recent_producers: list[RegistryDiscoveryItem]
+    recent_wines: list[RegistryDiscoveryItem]
+    recent_vintages: list[RegistryDiscoveryItem]
+    quality_risks: list[RegistryQualityRisk]
 
 
 class LabelImageUploadRead(OrmModel):

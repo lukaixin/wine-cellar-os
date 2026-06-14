@@ -22,6 +22,7 @@ from app.schemas.common import (
     CsvImportRow,
 )
 from app.services.inventory_service import BottleCreationResult, InventoryService
+from app.services.registry_service import RegistryService
 
 REQUIRED_FIELDS = [
     "producer_name",
@@ -277,21 +278,25 @@ class CsvImportService:
         )
 
     def _get_or_create_producer(self, row: CsvImportRow) -> Producer:
+        registry = RegistryService(self.session)
         producer = self.session.scalar(
             select(Producer).where(func.lower(Producer.name_original) == row.producer_name.lower())
         )
         if producer is not None:
+            registry.apply_producer_fields(producer)
             return producer
         producer = Producer(
             name_original=row.producer_name,
             country=row.country,
             region=row.region,
         )
+        registry.apply_producer_fields(producer)
         self.session.add(producer)
         self.session.flush()
         return producer
 
     def _get_or_create_wine(self, row: CsvImportRow, producer: Producer) -> Wine:
+        registry = RegistryService(self.session)
         wine = self.session.scalar(
             select(Wine).where(
                 Wine.producer_id == producer.id,
@@ -299,6 +304,7 @@ class CsvImportService:
             )
         )
         if wine is not None:
+            registry.apply_wine_fields(wine, producer)
             return wine
         wine = Wine(
             producer_id=producer.id,
@@ -307,11 +313,13 @@ class CsvImportService:
             country=row.country,
             region=row.region,
         )
+        registry.apply_wine_fields(wine, producer)
         self.session.add(wine)
         self.session.flush()
         return wine
 
     def _get_or_create_vintage(self, row: CsvImportRow, wine: Wine) -> Vintage:
+        registry = RegistryService(self.session)
         vintage = self.session.scalar(
             select(Vintage).where(
                 Vintage.wine_id == wine.id,
@@ -320,6 +328,7 @@ class CsvImportService:
             )
         )
         if vintage is not None:
+            registry.apply_vintage_fields(vintage)
             return vintage
         vintage = Vintage(
             wine_id=wine.id,
@@ -329,6 +338,7 @@ class CsvImportService:
             default_drink_to=row.drink_to,
             drink_window_confidence="low" if row.drink_from or row.drink_to else None,
         )
+        registry.apply_vintage_fields(vintage)
         self.session.add(vintage)
         self.session.flush()
         return vintage

@@ -5,6 +5,7 @@ import io
 import json
 import re
 import unicodedata
+import zipfile
 from collections import Counter
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -26,6 +27,7 @@ from app.schemas.common import (
     WineListImportRegistryPreview,
 )
 from app.services.inventory_service import BottleCreationResult, InventoryService
+from app.services.registry_service import RegistryService, normalize_registry_text
 
 SHEET_NAME = "Stock"
 EXPECTED_HEADERS = [
@@ -108,29 +110,6 @@ def _lookup_key(value: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def _alias_values(value: list[str] | dict[str, Any] | None) -> list[str]:
-    if isinstance(value, list):
-        return [item for item in value if isinstance(item, str)]
-    if isinstance(value, dict):
-        values: list[str] = []
-        for item in value.values():
-            if isinstance(item, str):
-                values.append(item)
-            elif isinstance(item, list):
-                values.extend(child for child in item if isinstance(child, str))
-        return values
-    return []
-
-
-def _append_alias(current: list[str] | dict[str, Any] | None, original: str, canonical: str) -> list[str] | None:
-    if _lookup_key(original) == _lookup_key(canonical):
-        return current if isinstance(current, list) else _alias_values(current) or None
-    aliases = _alias_values(current)
-    if all(_lookup_key(item) != _lookup_key(original) for item in aliases):
-        aliases.append(original)
-    return aliases or None
-
-
 @dataclass(frozen=True)
 class ParsedWineListRow:
     row_number: int
@@ -159,7 +138,10 @@ class WineListImportService:
             raise HTTPException(status_code=422, detail=f"Workbook must include {SHEET_NAME} sheet")
 
         sheet = workbook[SHEET_NAME]
-        headers = [_clean(cell.value) for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
+        headers = [
+            _clean(cell.value)
+            for cell in next(sheet.iter_rows(min_row=1, max_row=1, max_col=len(EXPECTED_HEADERS)))
+        ]
         self._validate_headers(headers)
 
         parsed_rows = self._parse_rows(sheet, file_sha256)
@@ -203,6 +185,8 @@ class WineListImportService:
             )
             self.session.add(db_row)
             db_rows.append(db_row)
+        self.session.flush()
+        self._record_registry_mappings(batch, db_rows)
         self.session.commit()
         self.session.refresh(batch)
         for db_row in db_rows:
@@ -286,7 +270,24 @@ class WineListImportService:
         try:
             return load_workbook(io.BytesIO(content), read_only=True, data_only=True)
         except Exception as exc:
-            raise HTTPException(status_code=422, detail=f"Cannot read WineList workbook: {exc}") from exc
+            try:
+                return load_workbook(self._workbook_without_styles(content), read_only=True, data_only=True)
+            except Exception:
+                raise HTTPException(status_code=422, detail=f"Cannot read WineList workbook: {exc}") from exc
+
+    def _workbook_without_styles(self, content: bytes) -> io.BytesIO:
+        sanitized = io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(content)) as source, zipfile.ZipFile(
+            sanitized,
+            mode="w",
+            compression=zipfile.ZIP_DEFLATED,
+        ) as target:
+            for item in source.infolist():
+                if item.filename == "xl/styles.xml":
+                    continue
+                target.writestr(item, source.read(item.filename))
+        sanitized.seek(0)
+        return sanitized
 
     def _validate_headers(self, headers: list[str | None]) -> None:
         actual = [header for header in headers[: len(EXPECTED_HEADERS)]]
@@ -296,7 +297,10 @@ class WineListImportService:
 
     def _parse_rows(self, sheet, file_sha256: str) -> list[ParsedWineListRow]:
         rows: list[ParsedWineListRow] = []
-        for row_number, values in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+        for row_number, values in enumerate(
+            sheet.iter_rows(min_row=2, max_col=len(EXPECTED_HEADERS), values_only=True),
+            start=2,
+        ):
             raw = {header: _json_ready(value) for header, value in zip(EXPECTED_HEADERS, values, strict=False)}
             if not any(_clean(raw.get(field)) for field in ["Producer", "Wine", "Vintage", "Quantity"]):
                 continue
@@ -354,6 +358,15 @@ class WineListImportService:
         assert quantity is not None
         assert location_key is not None
         location = LOCATION_CONFIG[location_key]
+        registry_decision = RegistryService(self.session).evaluate_winelist_row(
+            producer_name=producer_name,
+            wine_name=wine_name,
+            vintage_year=vintage_year,
+            country=country,
+            region=region,
+            appellation=appellation,
+            wine_type=wine_type,
+        )
         return WineListImportNormalizedRow(
             country=country,
             region=region,
@@ -374,6 +387,11 @@ class WineListImportService:
             location_key=location_key,
             raw_status=raw_status,
             raw_cave=raw_cave,
+            producer_match_score=registry_decision.producer_match.match_score,
+            wine_match_score=registry_decision.wine_match.match_score,
+            vintage_match_score=registry_decision.vintage_match.match_score,
+            overall_match_score=registry_decision.overall_match_score,
+            decision=registry_decision.decision,
         )
 
     def _region(self, value: str | None, warnings: list[str]) -> str | None:
@@ -474,11 +492,75 @@ class WineListImportService:
             query = query.where(ImportBatch.id != exclude_batch_id)
         return set(self.session.scalars(query).all())
 
+    def _record_registry_mappings(self, batch: ImportBatch, rows: list[ImportBatchRow]) -> None:
+        registry = RegistryService(self.session)
+        for row in rows:
+            if row.normalized_row is None:
+                if any("is required" in error for error in row.errors or []):
+                    registry.enqueue_review(
+                        review_type="missing_field",
+                        title=f"WineList row {row.source_row_number} has missing fields",
+                        detail="Draft row is invalid and requires manual source cleanup before confirm.",
+                        source="winelist:Stock",
+                        raw_value=row.raw_row,
+                        evidence={"errors": row.errors or []},
+                    )
+                continue
+
+            normalized = WineListImportNormalizedRow.model_validate(row.normalized_row)
+            registry_decision = registry.evaluate_winelist_row(
+                producer_name=normalized.producer_name,
+                wine_name=normalized.wine_name,
+                vintage_year=normalized.vintage_year,
+                country=normalized.country,
+                region=normalized.region,
+                appellation=normalized.appellation,
+                wine_type=normalized.type,
+            )
+            matches = [
+                ("Producer", normalized.producer_name, registry_decision.producer_match),
+                ("Wine", normalized.wine_name, registry_decision.wine_match),
+                ("Vintage", str(normalized.vintage_year), registry_decision.vintage_match),
+            ]
+            for field_name, raw_value, match in matches:
+                mapping = registry.record_import_mapping(
+                    source="winelist:Stock",
+                    import_batch_id=batch.id,
+                    import_batch_row_id=row.id,
+                    source_row_number=row.source_row_number,
+                    raw_value={"field": field_name, "value": raw_value},
+                    match=match,
+                )
+                if match.matched_by == "alias_conflict":
+                    registry.enqueue_review(
+                        review_type="alias_conflict",
+                        title=f"WineList row {row.source_row_number} alias conflict",
+                        detail=f"{field_name} alias points to more than one registry entity.",
+                        source="winelist:Stock",
+                        entity_type=match.entity_type,
+                        entity_id=match.target_id,
+                        import_mapping_id=mapping.id,
+                        raw_value={"field": field_name, "value": raw_value},
+                        match_score=match.match_score,
+                        evidence=match.evidence,
+                    )
+                elif match.decision == "needs_review":
+                    registry.enqueue_review(
+                        review_type="match_range",
+                        title=f"WineList row {row.source_row_number} needs registry review",
+                        detail=f"{field_name} matched at {match.match_score}; review before treating it as stable.",
+                        source="winelist:Stock",
+                        entity_type=match.entity_type,
+                        entity_id=match.target_id,
+                        import_mapping_id=mapping.id,
+                        raw_value={"field": field_name, "value": raw_value},
+                        match_score=match.match_score,
+                        evidence=match.evidence,
+                    )
+
     def _registry_preview(self, rows: list[ParsedWineListRow]) -> WineListImportRegistryPreview:
         valid = [row.normalized for row in rows if row.status == "valid" and row.normalized is not None]
-        existing_producers = self._producer_lookup()
-        existing_wines = self._wine_lookup(existing_producers)
-        existing_vintages = self._vintage_lookup()
+        registry = RegistryService(self.session)
 
         seen_producers: set[str] = set()
         seen_wines: set[tuple[str, str]] = set()
@@ -491,27 +573,38 @@ class WineListImportService:
         vintage_new = 0
 
         for row in valid:
-            producer_key = _lookup_key(row.producer_name)
+            producer_key = normalize_registry_text(row.producer_name)
+            producer_match = registry.match_producer(row.producer_name)
             if producer_key not in seen_producers:
                 seen_producers.add(producer_key)
-                if producer_key in existing_producers:
+                if producer_match.target_id is not None and producer_match.decision == "auto_accepted":
                     producer_existing += 1
                 else:
                     producer_new += 1
 
-            wine_key = (producer_key, _lookup_key(row.wine_name))
+            producer = self.session.get(Producer, producer_match.target_id) if producer_match.target_id else None
+            wine_match = registry.match_wine(
+                producer,
+                row.wine_name,
+                country=row.country,
+                region=row.region,
+                appellation=row.appellation,
+                wine_type=row.type,
+            )
+            wine_key = (producer_key, normalize_registry_text(row.wine_name))
             if wine_key not in seen_wines:
                 seen_wines.add(wine_key)
-                if wine_key in existing_wines:
+                if wine_match.target_id is not None and wine_match.decision == "auto_accepted":
                     wine_existing += 1
                 else:
                     wine_new += 1
 
-            vintage_key = (producer_key, _lookup_key(row.wine_name), row.vintage_year)
+            wine = self.session.get(Wine, wine_match.target_id) if wine_match.target_id else None
+            vintage_match = registry.match_vintage(wine, row.vintage_year)
+            vintage_key = (producer_key, normalize_registry_text(row.wine_name), row.vintage_year)
             if vintage_key not in seen_vintages:
                 seen_vintages.add(vintage_key)
-                existing_wine_id = existing_wines.get(wine_key)
-                if existing_wine_id is not None and (existing_wine_id, row.vintage_year) in existing_vintages:
+                if vintage_match.target_id is not None and vintage_match.decision == "auto_accepted":
                     vintage_existing += 1
                 else:
                     vintage_new += 1
@@ -524,37 +617,6 @@ class WineListImportService:
             vintages_new=vintage_new,
             vintages_existing=vintage_existing,
         )
-
-    def _producer_lookup(self) -> dict[str, Producer]:
-        lookup: dict[str, Producer] = {}
-        for producer in self.session.scalars(select(Producer)).all():
-            lookup[_lookup_key(producer.name_original)] = producer
-            for alias in _alias_values(producer.aliases):
-                lookup.setdefault(_lookup_key(alias), producer)
-        return lookup
-
-    def _wine_lookup(self, producer_lookup: dict[str, Producer]) -> dict[tuple[str, str], str]:
-        producer_name_by_id = {
-            producer.id: _lookup_key(producer.name_original) for producer in set(producer_lookup.values())
-        }
-        lookup: dict[tuple[str, str], str] = {}
-        for wine in self.session.scalars(select(Wine)).all():
-            producer_key = producer_name_by_id.get(wine.producer_id)
-            if producer_key is None:
-                continue
-            lookup[(producer_key, _lookup_key(wine.name_original))] = wine.id
-            for alias in _alias_values(wine.aliases):
-                lookup.setdefault((producer_key, _lookup_key(alias)), wine.id)
-        return lookup
-
-    def _vintage_lookup(self) -> set[tuple[str, int]]:
-        return {
-            (vintage.wine_id, vintage.vintage_year)
-            for vintage in self.session.scalars(
-                select(Vintage).where(Vintage.is_non_vintage.is_(False), Vintage.vintage_year.is_not(None))
-            ).all()
-            if vintage.vintage_year is not None
-        }
 
     def _location_counts(self, rows: list[ParsedWineListRow]) -> dict[str, int]:
         counts: Counter[str] = Counter()
@@ -653,11 +715,17 @@ class WineListImportService:
         )
 
     def _get_or_create_producer(self, row: WineListImportNormalizedRow) -> Producer:
-        producer = self._find_producer(row.producer_name)
+        registry = RegistryService(self.session)
+        producer_match = registry.match_producer(row.producer_name)
+        producer = (
+            self.session.get(Producer, producer_match.target_id)
+            if producer_match.target_id is not None and producer_match.decision == "auto_accepted"
+            else None
+        )
         if producer is not None:
             producer.country = producer.country or row.country
             producer.region = producer.region or row.region
-            producer.aliases = _append_alias(producer.aliases, row.producer_name, producer.name_original)
+            registry.apply_producer_fields(producer)
             self.session.add(producer)
             return producer
         producer = Producer(
@@ -666,27 +734,32 @@ class WineListImportService:
             region=row.region,
             aliases=None,
         )
+        registry.apply_producer_fields(producer)
         self.session.add(producer)
         self.session.flush()
         return producer
 
-    def _find_producer(self, name: str) -> Producer | None:
-        target = _lookup_key(name)
-        for producer in self.session.scalars(select(Producer)).all():
-            if _lookup_key(producer.name_original) == target:
-                return producer
-            if any(_lookup_key(alias) == target for alias in _alias_values(producer.aliases)):
-                return producer
-        return None
-
     def _get_or_create_wine(self, row: WineListImportNormalizedRow, producer: Producer) -> Wine:
-        wine = self._find_wine(producer.id, row.wine_name)
+        registry = RegistryService(self.session)
+        wine_match = registry.match_wine(
+            producer,
+            row.wine_name,
+            country=row.country,
+            region=row.region,
+            appellation=row.appellation,
+            wine_type=row.type,
+        )
+        wine = (
+            self.session.get(Wine, wine_match.target_id)
+            if wine_match.target_id is not None and wine_match.decision == "auto_accepted"
+            else None
+        )
         if wine is not None:
             wine.country = wine.country or row.country
             wine.region = wine.region or row.region
             wine.appellation = wine.appellation or row.appellation
             wine.type = wine.type or row.type
-            wine.aliases = _append_alias(wine.aliases, row.wine_name, wine.name_original)
+            registry.apply_wine_fields(wine, producer)
             self.session.add(wine)
             return wine
         wine = Wine(
@@ -698,18 +771,10 @@ class WineListImportService:
             appellation=row.appellation,
             aliases=None,
         )
+        registry.apply_wine_fields(wine, producer)
         self.session.add(wine)
         self.session.flush()
         return wine
-
-    def _find_wine(self, producer_id: str, name: str) -> Wine | None:
-        target = _lookup_key(name)
-        for wine in self.session.scalars(select(Wine).where(Wine.producer_id == producer_id)).all():
-            if _lookup_key(wine.name_original) == target:
-                return wine
-            if any(_lookup_key(alias) == target for alias in _alias_values(wine.aliases)):
-                return wine
-        return None
 
     def _get_or_create_vintage(self, row: WineListImportNormalizedRow, wine: Wine) -> Vintage:
         vintage = self.session.scalar(
@@ -720,8 +785,10 @@ class WineListImportService:
             )
         )
         if vintage is not None:
+            RegistryService(self.session).apply_vintage_fields(vintage)
             return vintage
         vintage = Vintage(wine_id=wine.id, vintage_year=row.vintage_year, is_non_vintage=False)
+        RegistryService(self.session).apply_vintage_fields(vintage)
         self.session.add(vintage)
         self.session.flush()
         return vintage

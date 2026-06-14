@@ -7,9 +7,12 @@ import { AddBottlePage } from "./pages/AddBottlePage";
 import { BottleDetailPage } from "./pages/BottleDetailPage";
 import { BottlesPage } from "./pages/BottlesPage";
 import { CellarPage } from "./pages/CellarPage";
+import { CollectionExplorerPage } from "./pages/CollectionExplorerPage";
 import { CsvImportPage } from "./pages/CsvImportPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LabelIntakePage } from "./pages/LabelIntakePage";
+import { RegistryQualityPage } from "./pages/RegistryQualityPage";
+import { RegistrySearchPage } from "./pages/RegistrySearchPage";
 import { TransactionsPage } from "./pages/TransactionsPage";
 
 export default function App() {
@@ -37,6 +40,7 @@ export default function App() {
       refresh={refresh}
     >
       {page === "dashboard" && <DashboardPage data={data} openBottle={openBottle} />}
+      {page === "collection" && <CollectionExplorerPage data={data} afterMutation={afterMutation} />}
       {page === "bottles" && <BottlesPage data={data} openBottle={openBottle} />}
       {page === "detail" && selectedBottle ? (
         <BottleDetailPage
@@ -50,6 +54,8 @@ export default function App() {
       ) : null}
       {page === "add" && <AddBottlePage data={data} afterMutation={afterMutation} openBottle={openBottle} />}
       {page === "import" && <CsvImportPage afterMutation={afterMutation} openBottle={openBottle} />}
+      {page === "registry-search" && <RegistrySearchPage />}
+      {page === "registry" && <RegistryQualityPage />}
       {page === "label" && <LabelIntakePage data={data} afterMutation={afterMutation} openBottle={openBottle} />}
       {page === "cellar" && <CellarPage data={data} openBottle={openBottle} afterMutation={afterMutation} />}
       {page === "transactions" && <TransactionsPage data={data} afterMutation={afterMutation} />}

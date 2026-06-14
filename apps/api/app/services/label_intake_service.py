@@ -23,6 +23,7 @@ from app.schemas.common import (
 )
 from app.services.inventory_service import InventoryService
 from app.services.label_recognizer import LabelRecognizer, MockLabelRecognizer
+from app.services.registry_service import RegistryService
 
 ALLOWED_LABEL_CONTENT_TYPES = {
     "image/jpeg": ".jpg",
@@ -138,21 +139,25 @@ class LabelIntakeService:
         return location
 
     def _get_or_create_producer(self, payload: LabelDraftConfirmRequest) -> Producer:
+        registry = RegistryService(self.session)
         producer = self.session.scalar(
             select(Producer).where(func.lower(Producer.name_original) == payload.producer_name.lower())
         )
         if producer is not None:
+            registry.apply_producer_fields(producer)
             return producer
         producer = Producer(
             name_original=payload.producer_name,
             country=payload.country,
             region=payload.region,
         )
+        registry.apply_producer_fields(producer)
         self.session.add(producer)
         self.session.flush()
         return producer
 
     def _get_or_create_wine(self, payload: LabelDraftConfirmRequest, producer: Producer) -> Wine:
+        registry = RegistryService(self.session)
         wine = self.session.scalar(
             select(Wine).where(
                 Wine.producer_id == producer.id,
@@ -160,6 +165,7 @@ class LabelIntakeService:
             )
         )
         if wine is not None:
+            registry.apply_wine_fields(wine, producer)
             return wine
         wine = Wine(
             producer_id=producer.id,
@@ -168,11 +174,13 @@ class LabelIntakeService:
             country=payload.country,
             region=payload.region,
         )
+        registry.apply_wine_fields(wine, producer)
         self.session.add(wine)
         self.session.flush()
         return wine
 
     def _get_or_create_vintage(self, payload: LabelDraftConfirmRequest, wine: Wine) -> Vintage:
+        registry = RegistryService(self.session)
         vintage = self.session.scalar(
             select(Vintage).where(
                 Vintage.wine_id == wine.id,
@@ -181,12 +189,14 @@ class LabelIntakeService:
             )
         )
         if vintage is not None:
+            registry.apply_vintage_fields(vintage)
             return vintage
         vintage = Vintage(
             wine_id=wine.id,
             vintage_year=payload.vintage_year,
             is_non_vintage=False,
         )
+        registry.apply_vintage_fields(vintage)
         self.session.add(vintage)
         self.session.flush()
         return vintage

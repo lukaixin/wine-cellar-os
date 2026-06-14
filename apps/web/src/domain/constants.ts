@@ -1,4 +1,15 @@
-export type Page = "dashboard" | "bottles" | "detail" | "add" | "import" | "label" | "cellar" | "transactions";
+export type Page =
+  | "dashboard"
+  | "bottles"
+  | "collection"
+  | "detail"
+  | "add"
+  | "import"
+  | "registry-search"
+  | "registry"
+  | "label"
+  | "cellar"
+  | "transactions";
 
 export type BottleAction = "MOVE" | "CONSUME" | "GIFT" | "DAMAGE" | "ADJUST";
 
@@ -41,9 +52,12 @@ export function pageTitle(page: Page): string {
   return {
     dashboard: "Dashboard",
     bottles: "藏酒列表",
+    collection: "Collection Explorer",
     detail: "酒瓶详情",
     add: "新增入库",
     import: "库存导入",
+    "registry-search": "Registry Search",
+    registry: "Registry Quality",
     label: "酒标入库",
     cellar: "酒柜地图",
     transactions: "Transaction",

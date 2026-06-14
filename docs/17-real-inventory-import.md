@@ -18,10 +18,11 @@
 2. Draft 会校验表头、必填字段、年份、数量、成本、Style 和位置映射。
 3. Draft 会写入 `import_batches` 和 `import_batch_rows`，保存文件 hash、原始行、规范化行、错误和 warning。
 4. Draft 不创建 Producer、Wine、Vintage、Bottle 或 InventoryTransaction。
-5. Confirm 必须在全部行有效时执行。
-6. Confirm 使用单个数据库事务；任意一瓶写入失败，整批 rollback。
-7. Confirm 会创建或复用三个 coarse location，再通过 `IN` ledger 展开每瓶库存。
-8. 导入完成后可在前端 `Import Batch History` 查看批次列表和行级 review。
+5. Draft 会记录 registry import mapping、匹配分和需要人工关注的 registry review queue。
+6. Confirm 必须在全部行有效时执行。
+7. Confirm 使用单个数据库事务；任意一瓶写入失败，整批 rollback。
+8. Confirm 会创建或复用三个 coarse location，再通过 `IN` ledger 展开每瓶库存。
+9. 导入完成后可在前端 `Import Batch History` 查看批次列表和行级 review。
 
 ## 审计 API
 
@@ -48,6 +49,28 @@ GET /imports/batches/{batch_id}
 - created_bottle_ids 和 ledger_transaction_ids。
 
 这些接口不提供删除、回滚或直接修正库存能力。
+
+## Registry 匹配分
+
+WineList draft 行新增：
+
+```text
+producer_match_score
+wine_match_score
+vintage_match_score
+overall_match_score
+decision
+```
+
+规则：
+
+```text
+>= 95    auto_accepted
+80-94    needs_review，并进入 registry_review_queue
+< 80     manual_required
+```
+
+没有候选对象的新 Producer/Wine/Vintage 会作为新 registry entity 继续现有导入流程；这不是自动合并。Alias 只有 `approved` 状态才能用于稳定匹配，冲突 alias 会进入 review queue。
 
 ## 字段映射
 

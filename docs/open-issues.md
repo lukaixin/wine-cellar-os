@@ -7,6 +7,8 @@
 - 本地数据库迁移已引入 Alembic baseline。剩余风险从“没有迁移工具”转为“旧库 schema 若偏离当前模型，需要专门增量 migration，不应靠删除数据库解决”。
 - CSV confirm 已改为单批次事务提交。剩余导入风险转为“CSV 尚未复用 import batch 历史，且没有人工回滚/撤销流程”，库存 ledger 本身仍保留每瓶 `IN` transaction。
 - WineList Stock 真实库存导入已新增 import batch 审计表、atomic confirm 和批次详情 review。剩余风险转为“人工撤销/补偿和更细的人工匹配确认尚未实现”。
+- Beta-1A Registry Foundation 已新增 canonical key、alias/mapping/review/finding 表和 Registry Quality 页面。剩余风险转为“review queue 只读、alias approve/reject 和 merge planning 尚未实现”，且任何未来合并都不能自动迁移 Bottle 外键或改写 Ledger。
+- Beta-2 Registry Search & Discovery 已新增统一搜索、只读详情和 discovery 页面。剩余风险转为“搜索阈值和 alias provenance 还需要真实样本继续校准”，且 search 命中不能被当作自动合并或审批依据。
 - Dashboard 酒窖健康分已经可用，但只基于本地库存、位置容量和手工适饮期字段计算；它不能替代专业品鉴、储存检查、价格估值或投资建议。
 
 ## 确认 Bug
@@ -27,6 +29,11 @@
 | P2 | API 测试 fixture 在多个测试文件中重复。 | 测试维护成本上升。 | 提取到 `tests/conftest.py`。 |
 | P2 | CSV tags 只解析不落库。 | 用户可能以为标签已经保存。 | 接入 `tags/object_tags` 或在 UI 中更明确标注。 |
 | P2 | WineList import batch 已可查看详情，但没有撤销/补偿向导。 | 用户可以审计来源和创建结果，但不能按批次生成安全补偿动作。 | 撤销只能通过 ledger 补偿交易设计，不应删除原 transaction。 |
+| P2 | Registry Review Queue 当前只读。 | 80-95 分匹配、alias 冲突和疑似重复可见，但不能在 UI 中处理状态。 | 后续增加人工处理状态和备注；不要让处理动作直接改写正式库存。 |
+| P2 | Alias Registry 尚无人工 approve/reject UI。 | `approved` alias 才能稳定匹配，但当前缺少用户确认入口。 | 增加 alias 管理页面或在 Registry Quality 中补操作；冲突 alias 必须先复核。 |
+| P2 | Registry Search 的 fuzzy/partial 阈值仍是本地启发式。 | 短查询、跨语言简称和相近酒名可能需要更多真实样本校准。 | 保持搜索结果显示 `matched_text/matched_by/score/quality_status`，后续用 WineList 样本和人工反馈调阈值。 |
+| P2 | Registry Discovery 的 recent new entity 只按 `created_at` 排序。 | 暂不能区分手工创建、WineList 导入或未来 CSV batch 来源。 | 后续可把 import mapping/import batch provenance 聚合到 discovery item。 |
+| P2 | `merged_into_id` 只是治理标记。 | 疑似重复可以被标记，但系统不会迁移旧 Bottle 或改写 Ledger。 | 后续如做合并规划，应先生成可审计 plan，不直接执行外键迁移。 |
 | P2 | 酒标草稿没有持久化 draft/reject 历史。 | 用户关闭页面后只能重新上传并生成草稿。 | 增加 label draft 表或 intake session 表，仍保持确认前不落正式库存。 |
 | P3 | 已上传酒标图片没有详情页回看。 | 确认后用户不能从 bottle detail 查看已归档图片。 | 增加受控本地静态文件读取或 media asset 关联。 |
 
@@ -48,5 +55,7 @@
 | P1 | 真实库存数据库或真实购买记录被误提交。 | 保持 `.gitignore`，不要提交 `data/`、真实图片和本地数据库；文档持续提醒。 |
 | P1 | 未来导入或价格模块绕过 ledger 直接改库存快照。 | 所有库存变更必须经过 InventoryService 和 InventoryTransaction 测试。 |
 | P2 | 导入字段含糊导致重复 Producer/Wine/Vintage。 | 增加导入前匹配预览和人工合并流程。 |
+| P2 | Alias 被误当作合并依据。 | 保持 alias 与 merge 分离；只有 approved alias 可稳定匹配，conflict/candidate/observed 不应自动命中。 |
+| P2 | 搜索结果被误当作权威 registry 判定。 | 搜索只提供发现和核验入口；所有合并、审批、库存变更仍需独立人工确认流程。 |
 | P2 | 价格数据来源合规风险。 | 只做 manual/csv/screenshot/link note provider，不实现反爬或批量抓取。 |
 | P3 | 前端 smoke 基于 jsdom，不能覆盖真实浏览器布局。 | 关键布局稳定后补 Playwright 或浏览器截图 QA。 |

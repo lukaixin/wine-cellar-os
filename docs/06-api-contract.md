@@ -50,6 +50,19 @@ GET    /api/bottles/{id}/transactions
 POST   /api/bottles/{id}/media
 ```
 
+## Collection
+
+```text
+GET    /collection/search?q=&producer_id=&vintage_year=&location_id=&status=&limit=&offset=
+GET    /collection/bottles/{id}
+```
+
+前端也可使用等价 `/api/collection/...` 路径。当前均为只读接口：
+
+- search 返回 Bottle 库存分组结果，按 `vintage + location + status` 聚合，字段包含 Producer、Wine、Vintage、Bottle Count、Location、Status，并支持分页。
+- search 只支持 Producer、Vintage、Location、Status 四类 filter。
+- bottle detail 返回单瓶基础信息、quantity、location 和 acquisition date，不返回价格、适饮期、评分、推荐或分析字段。
+
 ## Cellars and locations
 
 ```text
@@ -82,6 +95,30 @@ GET  /api/export/bottles.xlsx
 POST /api/backup/create
 POST /api/backup/restore
 ```
+
+## Registry quality
+
+```text
+GET /registry/search?q=
+GET /registry/discovery
+GET /registry/producers/{id}
+GET /registry/wines/{id}
+GET /registry/vintages/{id}
+GET /registry/aliases
+GET /registry/import-mappings
+GET /registry/review-queue
+GET /registry/quality/findings
+```
+
+前端也可使用等价 `/api/registry/...` 路径。当前均为只读接口：
+
+- search 按 `Producer / Wine / Vintage` 分类返回 `id/entity_type/display_name/matched_text/matched_by/score/quality_status`。
+- discovery 返回最近新增 registry entity 以及 alias conflict / duplicate candidate 质量风险。
+- producer/wine/vintage detail 返回 registry 详情和只读聚合计数。
+- aliases 展示 `observed/candidate/approved/rejected/conflict` alias，不触发合并。
+- import-mappings 展示导入 raw value、target entity、match score、decision、rule version。
+- review-queue 展示 80-95 分匹配、alias 冲突、疑似重复、缺失字段等待人工关注项；本轮不提供审批动作。
+- quality/findings 会增量生成并返回 registry quality finding。
 
 ## Label intake
 

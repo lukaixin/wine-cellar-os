@@ -40,7 +40,18 @@ def test_alembic_upgrade_creates_schema_from_empty_sqlite(tmp_path, monkeypatch)
         "label_image_uploads",
         "import_batches",
         "import_batch_rows",
+        "registry_aliases",
+        "import_mappings",
+        "registry_review_queue",
+        "registry_quality_findings",
     }.issubset(tables)
+
+    producer_columns = {column["name"] for column in inspect(engine).get_columns("producers")}
+    wine_columns = {column["name"] for column in inspect(engine).get_columns("wines")}
+    vintage_columns = {column["name"] for column in inspect(engine).get_columns("vintages")}
+    assert {"canonical_key", "quality_status", "merged_into_id", "reviewed_at"}.issubset(producer_columns)
+    assert {"wine_identity_key", "quality_status", "merged_into_id", "reviewed_at"}.issubset(wine_columns)
+    assert {"quality_status", "reviewed_at"}.issubset(vintage_columns)
 
 
 def test_alembic_upgrade_stamps_existing_alpha_sqlite_without_deleting_data(tmp_path, monkeypatch) -> None:
@@ -52,13 +63,14 @@ def test_alembic_upgrade_stamps_existing_alpha_sqlite_without_deleting_data(tmp_
         connection.execute(
             text(
                 """
-                INSERT INTO producers (id, name_original, created_at, updated_at)
-                VALUES (:id, :name_original, :created_at, :updated_at)
+                INSERT INTO producers (id, name_original, quality_status, created_at, updated_at)
+                VALUES (:id, :name_original, :quality_status, :created_at, :updated_at)
                 """
             ),
             {
                 "id": "producer-existing",
                 "name_original": "Existing Estate",
+                "quality_status": "unreviewed",
                 "created_at": now,
                 "updated_at": now,
             },
@@ -69,6 +81,14 @@ def test_alembic_upgrade_stamps_existing_alpha_sqlite_without_deleting_data(tmp_
 
     with engine.connect() as connection:
         producer_count = connection.execute(text("SELECT COUNT(*) FROM producers")).scalar_one()
+        canonical_key = connection.execute(
+            text("SELECT canonical_key FROM producers WHERE id = 'producer-existing'")
+        ).scalar_one()
+        quality_status = connection.execute(
+            text("SELECT quality_status FROM producers WHERE id = 'producer-existing'")
+        ).scalar_one()
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
     assert producer_count == 1
-    assert version == "20260613_0002"
+    assert canonical_key == "existing estate"
+    assert quality_status == "unreviewed"
+    assert version == "20260613_0003"

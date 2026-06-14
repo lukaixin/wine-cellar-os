@@ -6,6 +6,7 @@ from app.core.database import get_session
 from app.models import Vintage, Wine
 from app.routers.helpers import apply_update, commit_or_400, get_or_404, vintage_to_read
 from app.schemas.common import VintageCreate, VintageRead, VintageUpdate
+from app.services.registry_service import RegistryService
 
 router = APIRouter(prefix="/api/vintages", tags=["vintages"])
 
@@ -24,6 +25,7 @@ def list_vintages(session: Session = Depends(get_session)) -> list[dict]:
 def create_vintage(payload: VintageCreate, session: Session = Depends(get_session)) -> dict:
     get_or_404(session, Wine, payload.wine_id, "Wine")
     vintage = Vintage(**payload.model_dump())
+    RegistryService(session).apply_vintage_fields(vintage)
     session.add(vintage)
     commit_or_400(session)
     vintage = session.scalars(_vintage_query().where(Vintage.id == vintage.id)).one()
@@ -45,6 +47,7 @@ def update_vintage(vintage_id: str, payload: VintageUpdate, session: Session = D
     if "wine_id" in values:
         get_or_404(session, Wine, values["wine_id"], "Wine")
     apply_update(vintage, values)
+    RegistryService(session).apply_vintage_fields(vintage)
     commit_or_400(session)
     vintage = session.scalars(_vintage_query().where(Vintage.id == vintage.id)).one()
     return vintage_to_read(vintage)

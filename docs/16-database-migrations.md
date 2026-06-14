@@ -19,6 +19,7 @@ Wine Cellar OS Alpha 默认使用本地 SQLite。随着字段和表继续增加�
 - `apps/api/migrations/env.py`
 - `apps/api/migrations/versions/20260613_0001_initial_alpha_schema.py`
 - `apps/api/migrations/versions/20260613_0002_import_batches.py`
+- `apps/api/migrations/versions/20260613_0003_registry_foundation.py`
 - `apps/api/scripts/backup_sqlite_db.py`
 
 ## 初始化或升级数据库
@@ -76,3 +77,4 @@ python -m alembic upgrade head
 - 如果用户手里的旧数据库 schema 已经偏离当前模型，baseline 不会自动补齐所有列级差异；需要先备份，再写专门的增量 migration。
 - FastAPI 启动仍保留当前本地开发的 `create_all` 行为；正式升级流程应使用 `python -m alembic upgrade head`。
 - `import_batches/import_batch_rows` 只记录导入批次审计，不提供自动撤销；撤销应另行设计 ledger 补偿流程。
+- `20260613_0003_registry_foundation` 只新增 registry 治理字段和只读观察表，回填 Producer/Wine key，不迁移 Bottle 外键、不修改 ledger、不做自动合并。

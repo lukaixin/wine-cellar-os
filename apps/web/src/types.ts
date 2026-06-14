@@ -4,6 +4,10 @@ export type Producer = {
   name_cn?: string | null;
   country?: string | null;
   region?: string | null;
+  canonical_key?: string | null;
+  quality_status?: string | null;
+  merged_into_id?: string | null;
+  reviewed_at?: string | null;
 };
 
 export type Wine = {
@@ -15,6 +19,10 @@ export type Wine = {
   type?: string | null;
   country?: string | null;
   region?: string | null;
+  wine_identity_key?: string | null;
+  quality_status?: string | null;
+  merged_into_id?: string | null;
+  reviewed_at?: string | null;
 };
 
 export type Vintage = {
@@ -27,6 +35,8 @@ export type Vintage = {
   default_drink_from?: number | null;
   default_drink_to?: number | null;
   drink_window_confidence?: string | null;
+  quality_status?: string | null;
+  reviewed_at?: string | null;
 };
 
 export type Cellar = {
@@ -82,6 +92,69 @@ export type Bottle = {
   location_code?: string | null;
 };
 
+export type CollectionLocation = {
+  id?: string | null;
+  cellar_name?: string | null;
+  code?: string | null;
+};
+
+export type CollectionSearchItem = {
+  bottle_id: string;
+  bottle_ids: string[];
+  producer_id?: string | null;
+  producer_name?: string | null;
+  producer_name_cn?: string | null;
+  wine_id?: string | null;
+  wine_name?: string | null;
+  wine_name_cn?: string | null;
+  vintage_id: string;
+  vintage_year?: number | null;
+  is_non_vintage: boolean;
+  bottle_count: number;
+  location: CollectionLocation;
+  status: string;
+};
+
+export type CollectionSearchResponse = {
+  query?: string | null;
+  total: number;
+  limit: number;
+  offset: number;
+  items: CollectionSearchItem[];
+};
+
+export type CollectionBottleDetail = {
+  id: string;
+  bottle_id: string;
+  bottle_size_ml: number;
+  quantity: number;
+  status: string;
+  acquisition_date?: string | null;
+  vintage_id: string;
+  vintage_year?: number | null;
+  is_non_vintage: boolean;
+  wine_id?: string | null;
+  wine_name?: string | null;
+  wine_name_cn?: string | null;
+  producer_id?: string | null;
+  producer_name?: string | null;
+  producer_name_cn?: string | null;
+  location: CollectionLocation;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CollectionBottleTimelineEvent = {
+  event_type: string;
+  event_time: string;
+  quantity_delta: number;
+  reference_type: "inventory_transaction";
+  reference_id: string;
+  from_location: CollectionLocation;
+  to_location: CollectionLocation;
+  notes?: string | null;
+};
+
 export type InventoryTransaction = {
   id: string;
   bottle_id: string;
@@ -95,6 +168,27 @@ export type InventoryTransaction = {
   bottle_label?: string | null;
   from_location_code?: string | null;
   to_location_code?: string | null;
+};
+
+export type ConsumeBottleActionRequest = {
+  bottle_id: string;
+  quantity: number;
+  notes?: string | null;
+};
+
+export type GiftBottleActionRequest = ConsumeBottleActionRequest & {
+  recipient: string;
+};
+
+export type DamageBottleActionRequest = ConsumeBottleActionRequest & {
+  reason: string;
+};
+
+export type MoveBottleActionRequest = {
+  bottle_id: string;
+  from_location: string;
+  to_location: string;
+  notes?: string | null;
 };
 
 export type DashboardSummary = {
@@ -223,6 +317,11 @@ export type WineListImportNormalizedRow = {
   location_key: string;
   raw_status?: string | null;
   raw_cave?: string | null;
+  producer_match_score: number;
+  wine_match_score: number;
+  vintage_match_score: number;
+  overall_match_score: number;
+  decision: "auto_accepted" | "needs_review" | "manual_required" | "rejected";
 };
 
 export type WineListImportDraftRow = {
@@ -355,6 +454,183 @@ export type LabelDraftConfirmResult = {
   bottle_id: string;
   upload_id: string;
   transaction_type: "IN";
+};
+
+export type RegistryAlias = {
+  id: string;
+  entity_type: "producer" | "wine" | "vintage";
+  entity_id: string;
+  alias_text: string;
+  alias_key: string;
+  status: "observed" | "candidate" | "approved" | "rejected" | "conflict";
+  source?: string | null;
+  rule_version: string;
+  confidence?: string | null;
+  import_mapping_id?: string | null;
+  reviewed_at?: string | null;
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ImportMapping = {
+  id: string;
+  source: string;
+  import_batch_id?: string | null;
+  import_batch_row_id?: string | null;
+  source_row_number?: number | null;
+  raw_value?: Record<string, unknown> | string | null;
+  target_entity_type: "producer" | "wine" | "vintage";
+  target_entity_id?: string | null;
+  match_score: number;
+  decision: "auto_accepted" | "needs_review" | "manual_required" | "rejected";
+  rule_version: string;
+  evidence?: Record<string, unknown> | unknown[] | null;
+  created_at: string;
+};
+
+export type RegistryReviewQueueItem = {
+  id: string;
+  review_type: "match_range" | "alias_conflict" | "suspected_duplicate" | "missing_field";
+  status: "open" | "closed";
+  source?: string | null;
+  entity_type?: string | null;
+  entity_id?: string | null;
+  import_mapping_id?: string | null;
+  raw_value?: Record<string, unknown> | string | null;
+  match_score?: number | null;
+  title: string;
+  detail?: string | null;
+  evidence?: Record<string, unknown> | unknown[] | null;
+  created_at: string;
+};
+
+export type RegistryQualityFinding = {
+  id: string;
+  finding_type:
+    | "duplicate_producer"
+    | "duplicate_wine"
+    | "alias_conflict"
+    | "missing_vintage"
+    | "missing_drink_window"
+    | "missing_region"
+    | "missing_country";
+  severity: "low" | "medium" | "high";
+  entity_type?: string | null;
+  entity_id?: string | null;
+  evidence: Record<string, unknown> | unknown[];
+  evidence_hash: string;
+  suggested_action: string;
+  status: "open" | "closed";
+  created_at: string;
+};
+
+export type RegistryQualityData = {
+  aliases: RegistryAlias[];
+  importMappings: ImportMapping[];
+  reviewQueue: RegistryReviewQueueItem[];
+  findings: RegistryQualityFinding[];
+};
+
+export type RegistryEntityType = "producer" | "wine" | "vintage";
+
+export type RegistrySearchResult = {
+  id: string;
+  entity_type: RegistryEntityType;
+  display_name: string;
+  matched_text: string;
+  matched_by: "canonical_name" | "alias" | "fuzzy" | "chinese_name" | "partial" | string;
+  score: number;
+  quality_status: string;
+};
+
+export type RegistrySearchResponse = {
+  query: string;
+  producers: RegistrySearchResult[];
+  wines: RegistrySearchResult[];
+  vintages: RegistrySearchResult[];
+};
+
+export type RegistryProducerDetail = {
+  id: string;
+  entity_type: "producer";
+  canonical_name: string;
+  name_cn?: string | null;
+  aliases: string[];
+  country?: string | null;
+  region?: string | null;
+  wine_count: number;
+  quality_status: string;
+  canonical_key?: string | null;
+};
+
+export type RegistryWineDetail = {
+  id: string;
+  entity_type: "wine";
+  canonical_name: string;
+  name_cn?: string | null;
+  producer_id: string;
+  producer_name: string;
+  aliases: string[];
+  vintage_count: number;
+  quality_status: string;
+  wine_identity_key?: string | null;
+};
+
+export type RegistryDrinkWindow = {
+  source: string;
+  source_detail?: string | null;
+  drink_from?: number | null;
+  drink_to?: number | null;
+  peak_from?: number | null;
+  peak_to?: number | null;
+  confidence: string;
+  notes?: string | null;
+};
+
+export type RegistryVintageDetail = {
+  id: string;
+  entity_type: "vintage";
+  producer_id: string;
+  producer_name: string;
+  wine_id: string;
+  wine_name: string;
+  vintage_year?: number | null;
+  is_non_vintage: boolean;
+  bottle_count: number;
+  default_drink_from?: number | null;
+  default_drink_to?: number | null;
+  drink_window_confidence?: string | null;
+  drink_windows: RegistryDrinkWindow[];
+  quality_status: string;
+};
+
+export type RegistryDetail = RegistryProducerDetail | RegistryWineDetail | RegistryVintageDetail;
+
+export type RegistryDiscoveryItem = {
+  id: string;
+  entity_type: RegistryEntityType;
+  display_name: string;
+  created_at: string;
+  quality_status: string;
+};
+
+export type RegistryQualityRisk = {
+  id: string;
+  finding_type: string;
+  severity: "low" | "medium" | "high";
+  entity_type?: RegistryEntityType | string | null;
+  entity_id?: string | null;
+  suggested_action: string;
+  evidence: Record<string, unknown> | unknown[];
+  created_at: string;
+};
+
+export type RegistryDiscovery = {
+  recent_producers: RegistryDiscoveryItem[];
+  recent_wines: RegistryDiscoveryItem[];
+  recent_vintages: RegistryDiscoveryItem[];
+  quality_risks: RegistryQualityRisk[];
 };
 
 export type AppData = {
