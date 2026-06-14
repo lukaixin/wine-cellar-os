@@ -341,6 +341,7 @@ class WineListImportService:
         vintage_year = self._vintage_year(_clean(raw.get("Vintage")), errors)
         quantity = self._quantity(_clean(raw.get("Quantity")), errors)
         purchase_price = self._cost(_clean(raw.get("Cost")), errors, warnings)
+        ws_price = self._ws_price(_clean(raw.get("WS Price")), errors)
         purchase_channel = _clean(raw.get("Channel"))
         raw_status = _clean(raw.get("Status"))
         raw_cave = _clean(raw.get("CAVE"))
@@ -381,6 +382,7 @@ class WineListImportService:
             purchase_currency="CNY",
             purchase_channel=purchase_channel,
             purchase_source="WineList.xlsx Stock",
+            ws_price=ws_price,
             cellar_name=location["cellar_name"],
             location_code=location["location_code"],
             location_label=location["location_label"],
@@ -449,6 +451,19 @@ class WineListImportService:
             errors.append(f"Cost must be a non-negative decimal: {value}")
             return None
         return cost
+
+    def _ws_price(self, value: str | None, errors: list[str]) -> Decimal | None:
+        if value is None:
+            return None
+        try:
+            price = Decimal(value).quantize(Decimal("0.01"))
+        except InvalidOperation:
+            errors.append(f"WS Price must be a non-negative decimal: {value}")
+            return None
+        if price < 0:
+            errors.append(f"WS Price must be a non-negative decimal: {value}")
+            return None
+        return price
 
     def _location_key(self, raw_status: str | None, raw_cave: str | None, errors: list[str]) -> str | None:
         status_key = _lookup_key(raw_status) if raw_status else ""
@@ -704,6 +719,7 @@ class WineListImportService:
                 purchase_currency=row.purchase_currency,
                 purchase_source=f"{batch.source_filename}:{SHEET_NAME}:row {db_row.source_row_number}",
                 purchase_channel=row.purchase_channel,
+                ws_price=row.ws_price,
                 personal_notes=f"WineList import batch {batch.id} row {db_row.source_row_number}",
                 actor="winelist_import",
                 note=(

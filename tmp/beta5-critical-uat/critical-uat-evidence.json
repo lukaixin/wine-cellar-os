@@ -1,0 +1,228 @@
+{
+  "api_base": "http://127.0.0.1:18100",
+  "db_path": "D:\\MyLife\\17_葡萄酒管理系统\\tmp\\beta5-critical-uat\\beta5-critical-uat.db",
+  "alembic_version": "20260614_0004",
+  "import": {
+    "batch_id": "00247fe7-1800-45e6-88c8-219b8cbd7330",
+    "draft_rows": 10,
+    "valid_rows": 10,
+    "created_bottles": 11,
+    "created_transactions": 11,
+    "location_counts": {
+      "家中酒柜 / C": 6,
+      "法国朋友家 / FR": 2,
+      "家中散放 / HOME-OUTSIDE": 3
+    }
+  },
+  "collection": {
+    "search_total": 10,
+    "first_bottle_id": "eb374472-0258-4059-8fc6-7690096f7774",
+    "first_detail_status": "in_stock",
+    "first_detail_ws_price": "880.00",
+    "initial_timeline_events": [
+      "IN"
+    ]
+  },
+  "actions": {
+    "consume": {
+      "bottle_id": "8625c1a0-67d6-4917-ae37-c31675aa263e",
+      "transaction_id": "ba46bdf7-52dd-4d42-a916-fe99d0541594",
+      "status": "drunk",
+      "timeline_head": "CONSUME"
+    },
+    "gift": {
+      "bottle_id": "0fd673f6-3579-4c2d-aa57-cb581b0d4435",
+      "transaction_id": "edb85751-177f-48f6-aa8d-37b32b5d81e2",
+      "status": "gifted",
+      "timeline_head": "GIFT"
+    },
+    "move": {
+      "bottle_id": "1f108c56-f548-4411-90da-b3e45a8b38cc",
+      "transaction_id": "9f27cbe5-862f-4ac8-9589-8b3a8019c517",
+      "status": "in_stock",
+      "target_location": {
+        "id": "f2bd2b04-3a39-4b85-a6f1-ccc1a0da6562",
+        "cellar_name": "Critical UAT Move Cellar",
+        "code": "UAT-MOVE-01"
+      },
+      "timeline_head": "MOVE"
+    },
+    "damage": {
+      "bottle_id": "4be77eb5-2972-4040-8e44-94bba62c1425",
+      "transaction_id": "7cdbb938-9360-4c93-8eed-8bde4de74dea",
+      "status": "damaged",
+      "timeline_head": "DAMAGE"
+    }
+  },
+  "analytics": {
+    "inventory": {
+      "total_bottles": 11,
+      "total_wines": 10,
+      "total_producers": 10,
+      "total_vintages": 10,
+      "total_ws_value": "21600.00",
+      "ws_priced_bottles": 11,
+      "country_distribution": [
+        {
+          "label": "France",
+          "count": 5
+        },
+        {
+          "label": "Italy",
+          "count": 2
+        },
+        {
+          "label": "Germany",
+          "count": 1
+        },
+        {
+          "label": "Portugal",
+          "count": 1
+        },
+        {
+          "label": "Spain",
+          "count": 1
+        },
+        {
+          "label": "USA",
+          "count": 1
+        }
+      ],
+      "region_distribution": [
+        {
+          "label": "Bordeaux",
+          "count": 2
+        },
+        {
+          "label": "Burgundy",
+          "count": 1
+        },
+        {
+          "label": "California",
+          "count": 1
+        },
+        {
+          "label": "Champagne",
+          "count": 1
+        },
+        {
+          "label": "Douro",
+          "count": 1
+        },
+        {
+          "label": "Mosel",
+          "count": 1
+        },
+        {
+          "label": "Piedmont",
+          "count": 1
+        },
+        {
+          "label": "Rioja",
+          "count": 1
+        },
+        {
+          "label": "Southern Rhone",
+          "count": 1
+        },
+        {
+          "label": "Tuscany",
+          "count": 1
+        }
+      ],
+      "vintage_distribution": [
+        {
+          "label": "2016",
+          "count": 2
+        },
+        {
+          "label": "2010",
+          "count": 1
+        },
+        {
+          "label": "2011",
+          "count": 1
+        },
+        {
+          "label": "2014",
+          "count": 1
+        },
+        {
+          "label": "2015",
+          "count": 1
+        },
+        {
+          "label": "2017",
+          "count": 1
+        },
+        {
+          "label": "2018",
+          "count": 1
+        },
+        {
+          "label": "2019",
+          "count": 1
+        },
+        {
+          "label": "2020",
+          "count": 1
+        },
+        {
+          "label": "2021",
+          "count": 1
+        }
+      ],
+      "status_distribution": [
+        {
+          "label": "in_stock",
+          "count": 8
+        },
+        {
+          "label": "damaged",
+          "count": 1
+        },
+        {
+          "label": "drunk",
+          "count": 1
+        },
+        {
+          "label": "gifted",
+          "count": 1
+        }
+      ]
+    },
+    "all_time_consumption": {
+      "key": "all_time",
+      "label": "All Time",
+      "consumed_bottles": 1,
+      "gifted_bottles": 1,
+      "damaged_bottles": 1
+    },
+    "activity_types": [
+      "DAMAGE",
+      "MOVE",
+      "GIFT",
+      "CONSUME",
+      "IMPORT",
+      "IMPORT",
+      "IMPORT",
+      "IMPORT",
+      "IMPORT",
+      "IMPORT",
+      "IMPORT",
+      "IMPORT",
+      "IMPORT",
+      "IMPORT",
+      "IMPORT"
+    ],
+    "db_ws_total": 21600.0,
+    "db_ws_priced_bottles": 11
+  },
+  "ws_price": {
+    "bottle_id": "eb374472-0258-4059-8fc6-7690096f7774",
+    "api_bottle_ws_price": "880.00",
+    "collection_bottle_ws_price": "880.00",
+    "analytics_total_ws_value": "21600.00",
+    "analytics_ws_priced_bottles": 11
+  }
+}

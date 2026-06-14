@@ -13,6 +13,16 @@
 - 前端新增 `Registry Quality` 页面，展示 Findings、Review Queue、Alias、Import Mapping；库存导入页同步展示 WineList 匹配分和 decision。
 - 本轮不实现审批流、不自动合并、不迁移 Bottle 外键、不修改 Ledger、不删除历史数据、不增加硬唯一约束。
 
+## 2026-06-14 更新：Beta-5 Analytics Foundation + WS Price Import Extension
+
+- 新增只读 Analytics API：`GET /analytics/summary` 和 `GET /api/analytics/summary`，运行时聚合 Inventory Summary、Country/Region/Vintage/Status Distribution、Consumption periods、Monthly Trend 和 Recent Activity。
+- Consumption 与 Activity 直接读取 `InventoryTransaction` ledger；Recent Activity 展示 Import、Consume、Gift、Move、Damage；没有新增独立统计表。
+- Bottle 新增 nullable `ws_price` 字段，并新增非破坏性 Alembic migration `20260614_0004_bottle_ws_price.py`。
+- WineList Stock 导入开始识别 `WS Price`：空值允许，非数字或负数作为行级错误；confirm 时每个展开 Bottle 写入对应行的 `ws_price`。
+- Bottle API 和 Collection Bottle Detail API 返回 `ws_price`；Analytics 增加 `total_ws_value = SUM(ws_price)` 和 `ws_priced_bottles`。
+- 前端新增 `Analytics` 页面，分为 Overview、Consumption 和 Activity 区域，保持只读。
+- 本轮不实现 ROI、价格历史、估值模型、市场波动、消费预测、AI 推荐、治理审批或 ledger schema 变更。
+
 ## 2026-06-13 更新：Beta-2 Registry Search & Discovery
 
 - 新增统一 registry search service，按 `Producer / Wine / Vintage` 分类返回结果，字段包含 `id/entity_type/display_name/matched_text/matched_by/score/quality_status`。
@@ -51,7 +61,7 @@
 - 新增 `WineList.xlsx` 的 `Stock` sheet 导入 workflow：draft 阶段只解析、校验并写入 import batch 审计记录，confirm 阶段才创建正式库存。
 - 新增 `import_batches` 和 `import_batch_rows` Alembic migration，用于保存来源文件、sheet、文件 hash、原始行、规范化行、warning/error、创建的 bottle id 和 transaction id。
 - WineList confirm 使用单个数据库事务，并通过 `InventoryService(..., commit=False)` 为每个展开后的 Bottle 生成 `IN` transaction；任意写入失败会整批 rollback。
-- `Stock.Quantity` 会展开为独立 Bottle；`Cost` 写入 `Bottle.purchase_price`，币种默认 `CNY`；`Channel` 写入 `purchase_channel`；`WS Price` 暂不导入估值。
+- `Stock.Quantity` 会展开为独立 Bottle；`Cost` 写入 `Bottle.purchase_price`，币种默认 `CNY`；`Channel` 写入 `purchase_channel`；`WS Price` 写入 `Bottle.ws_price`，但不创建估值历史。
 - 位置映射已固定为 `法国朋友家 / FR`、`家中酒柜 / C`、`家中散放 / HOME-OUTSIDE`。空 `Wine` 行按 `Producer` 同名酒款处理并记录 warning。
 - 前端“库存导入”页已新增 WineList Excel dry-run、位置汇总、registry 预览和确认入口，同时保留 CSV 草稿导入。
 - 新增 Import Batch Review：`GET /imports/batches` 和 `GET /imports/batches/{batch_id}` 支持查看批次列表、分页、行级 raw/parsed/warning/error，以及 created bottle ids 和 ledger transaction ids；前端同页展示 `Import Batch History` 和 `Import Batch Detail`。
@@ -89,7 +99,7 @@
 
 ## 当前项目状态
 
-当前处于本地 Alpha Demo + Beta inventory actions 阶段。后端已具备 FastAPI + SQLite + SQLAlchemy 基础模型、Alembic migration、CRUD API、库存 transaction workflow、Dashboard、CSV 导出、安全 CSV 导入草稿、WineList Stock 真实库存导入和批量事务确认工作流、Registry Foundation 观察表、质量发现、统一 registry search/detail/discovery API、Collection search/detail/timeline API、Inventory Actions API，以及本地酒标图片 intake 草稿工作流。前端已具备 React + Vite Alpha UI，覆盖 Dashboard、藏酒列表、Collection Explorer、Bottle Detail Drawer Actions/Timeline、手动入库、酒标入库、酒柜地图、Transaction 历史、CSV 导出、CSV 导入草稿、WineList Excel 导入 dry-run/确认、Registry Quality 和 Registry Search 页面。
+当前处于本地 Alpha Demo + Beta analytics foundation 阶段。后端已具备 FastAPI + SQLite + SQLAlchemy 基础模型、Alembic migration、CRUD API、库存 transaction workflow、Dashboard、Analytics Summary、CSV 导出、安全 CSV 导入草稿、WineList Stock 真实库存导入和批量事务确认工作流、Registry Foundation 观察表、质量发现、统一 registry search/detail/discovery API、Collection search/detail/timeline API、Inventory Actions API，以及本地酒标图片 intake 草稿工作流。前端已具备 React + Vite Alpha UI，覆盖 Dashboard、Analytics、藏酒列表、Collection Explorer、Bottle Detail Drawer Actions/Timeline、手动入库、酒标入库、酒柜地图、Transaction 历史、CSV 导出、CSV 导入草稿、WineList Excel 导入 dry-run/确认、Registry Quality 和 Registry Search 页面。
 
 项目仍保持本地单用户、无云同步、无账号权限、无真实 AI/OCR、无价格爬虫、无推荐引擎。当前酒标草稿使用本地 mock filename heuristic，只用于流程演示和字段预填。
 
@@ -115,6 +125,7 @@
 18. 2026-06-14：实现 Beta-3A Collection Explorer MVP，新增 collection search/detail API、Collection Explorer 页面、API/UI 测试和 `docs/20-collection-explorer.md`。
 19. 2026-06-14：实现 Beta-3B Bottle Detail & Timeline，新增 collection bottle timeline API、组内 Bottle 展开、Detail/Timeline tab、API/UI 测试和 `docs/21-bottle-detail-timeline.md`。
 20. 2026-06-14：实现 Beta-4 Inventory Actions，新增 ledger-backed Consume/Gift/Move/Damage action API、Bottle Detail Drawer Actions tab、API/UI 测试和 `docs/22-inventory-actions.md`。
+21. 2026-06-14：实现 Beta-5 Analytics Foundation + WS Price Import Extension，新增 Analytics API/UI、`Bottle.ws_price`、WineList WS Price 导入、API/UI 测试和 `docs/23-analytics-foundation.md`、`docs/24-ws-price-extension.md`。
 
 ## 本次变更涉及的主要模块
 
@@ -123,6 +134,9 @@
 - `apps/api/app/services/collection_service.py`：提供只读 Collection Search 和 Bottle Detail 查询，按库存 Bottle 维度聚合结果。
 - `apps/api/app/services/collection_service.py`：新增只读 Bottle Timeline 查询，直接读取 `InventoryTransaction` ledger 并按时间倒序返回事件。
 - `apps/api/app/routers/inventory_actions.py`：新增 Consume/Gift/Damage/Move action API，复用 `InventoryService` ledger 规则并返回 transaction。
+- `apps/api/app/services/analytics_service.py`：新增只读 Analytics 聚合，Consumption/Activity 直接来自 `InventoryTransaction`。
+- `apps/api/app/routers/analytics.py`：新增 `/analytics/summary` 和 `/api/analytics/summary`。
+- `apps/api/app/models/bottle.py`：新增 nullable `ws_price` 字段。
 - `apps/api/app/schemas/common.py`：新增 action request schema，包含单瓶 quantity、recipient、reason 和 from/to location payload。
 - `apps/api/app/models/registry.py`：新增 registry alias、import mapping、review queue、quality finding 模型。
 - `apps/api/app/routers/registry.py`：新增 registry 只读 API，包括 search、detail、discovery、alias、mapping、review queue 和 quality findings。
@@ -133,32 +147,38 @@
 - `apps/api/app/routers/import_batches.py`：新增导入批次只读 list/detail API。
 - `apps/api/migrations/versions/20260613_0002_import_batches.py`：新增导入审计表 migration。
 - `apps/api/migrations/versions/20260613_0003_registry_foundation.py`：新增 registry foundation migration，回填 Producer/Wine key。
+- `apps/api/migrations/versions/20260614_0004_bottle_ws_price.py`：新增 Bottle WS Price nullable 字段。
 - `apps/api/tests/test_winelist_import.py`：覆盖真实样本 dry-run、119 瓶展开、重复导入阻止和 confirm 失败 rollback。
 - `apps/api/tests/test_registry_foundation.py`：覆盖 canonical key、alias conflict、mapping、review queue、quality findings 和 WineList score。
 - `apps/api/tests/test_registry_foundation.py`：新增 registry search、alias search、ranking、detail API 和 discovery API 覆盖。
 - `apps/api/tests/test_collection_explorer.py`：覆盖 collection search、filters、pagination 和 bottle detail。
 - `apps/api/tests/test_collection_explorer.py`：新增 bottle timeline、timeline ordering、empty timeline 和 missing bottle 覆盖。
 - `apps/api/tests/test_inventory_actions.py`：新增 Consume/Gift/Damage/Move action API、quantity、重复出库、stale location 和 ledger 不变量覆盖。
+- `apps/api/tests/test_analytics.py`：新增 Analytics Summary、WS Price 汇总和 ledger activity 覆盖。
+- `apps/api/tests/test_winelist_import.py`：新增 WineList `WS Price` draft/confirm 落库覆盖。
 - `apps/web/src/pages/CsvImportPage.tsx`：新增 WineList Excel 导入 UI、Import Batch History/Detail，并保留 CSV 导入草稿。
 - `apps/web/src/pages/RegistryQualityPage.tsx`：新增 Registry Quality 页面。
 - `apps/web/src/pages/RegistrySearchPage.tsx`：新增 Registry Search 页面，分类展示搜索结果、详情和 discovery。
 - `apps/web/src/pages/CollectionExplorerPage.tsx`：新增 Collection Explorer 页面，支持搜索、筛选、分页和详情抽屉。
 - `apps/web/src/pages/CollectionExplorerPage.tsx`：新增 group 展开、组内 Bottle 选择和 Detail/Timeline tab 展示。
 - `apps/web/src/pages/CollectionExplorerPage.tsx`：新增 Bottle Detail Drawer Actions tab，提交 action 后刷新 detail、timeline、collection search 和全局数据。
+- `apps/web/src/pages/AnalyticsPage.tsx`：新增只读 Analytics 页面。
 - `docs/17-real-inventory-import.md`：新增真实库存导入规则、字段映射、位置映射和限制。
 - `docs/18-registry-foundation.md`：新增 registry foundation schema、API、migration 和限制说明。
 - `docs/19-registry-search.md`：新增 registry search/discovery 设计、API、排序和限制说明。
 - `docs/20-collection-explorer.md`：新增 collection explorer API、页面说明、数据流和限制说明。
 - `docs/21-bottle-detail-timeline.md`：新增 Bottle Detail、Timeline API、UI Flow 和 Known Limitations 说明。
 - `docs/22-inventory-actions.md`：新增 Inventory Actions API、校验规则、Timeline 集成和非目标说明。
+- `docs/23-analytics-foundation.md`：新增 Analytics Foundation API、数据来源、UI 和限制说明。
+- `docs/24-ws-price-extension.md`：新增 WS Price 存储决策、导入行为、API 展示和迁移策略说明。
 
 ## 最新验证结果
 
-- `python -m pytest -q`，工作目录 `apps/api`：通过，`59 passed in 21.93s`。
+- `python -m pytest -q`，工作目录 `apps/api`：通过，`67 passed in 30.64s`。
 - `npm.cmd run build`，工作目录 `apps/web`：通过，Vite `8.0.16` production build 成功。
-- `npm.cmd run test:ui`，工作目录 `apps/web`：通过，`1 passed`。
+- `npm.cmd run test:ui`，工作目录 `apps/web`：通过，`1 passed` / `2 passed`。
 - `npm.cmd run qa:alpha`，工作目录 `apps/web`：通过，`failures: []`，包含 `importedBottles: 1`、`total_bottles: 6`、`in_stock_bottles: 2`、`health_score: 79`。
-- 截图验证：生成 `artifacts/beta-3b-bottle-detail-timeline.png`，覆盖 Collection Explorer group 展开、Bottle 选择和 Timeline tab。
+- 截图验证：生成 `output/playwright/beta5-analytics.png`，覆盖 Analytics Overview、Distribution、Consumption 和 WS Price Coverage。
 
 ## 已知限制
 

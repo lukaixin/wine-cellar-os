@@ -1,0 +1,78 @@
+{
+  "docs/sql/uat-ledger-truth-check.sqlite.sql": [
+    {
+      "statement": 1,
+      "row_count": 0,
+      "rows": []
+    },
+    {
+      "statement": 2,
+      "row_count": 1,
+      "rows": [
+        {
+          "check_name": "ledger_truth_summary",
+          "bottle_count": 11,
+          "mismatch_count": 0
+        }
+      ]
+    },
+    {
+      "statement": 3,
+      "row_count": 0,
+      "rows": []
+    }
+  ],
+  "docs/sql/uat-ws-price-verification.sqlite.sql": [
+    {
+      "statement": 1,
+      "row_count": 0,
+      "rows": []
+    },
+    {
+      "statement": 2,
+      "row_count": 1,
+      "rows": [
+        {
+          "check_name": "database_ws_price_totals",
+          "database_total_ws_value": 21600.0,
+          "database_ws_priced_bottles": 11,
+          "database_total_bottles": 11
+        }
+      ]
+    },
+    {
+      "statement": 3,
+      "row_count": 4,
+      "rows": [
+        {
+          "check_name": "ws_price_by_status",
+          "current_status": "damaged",
+          "status_ws_value": 3000.0,
+          "status_ws_priced_bottles": 1,
+          "status_total_bottles": 1
+        },
+        {
+          "check_name": "ws_price_by_status",
+          "current_status": "drunk",
+          "status_ws_value": 4800.0,
+          "status_ws_priced_bottles": 1,
+          "status_total_bottles": 1
+        },
+        {
+          "check_name": "ws_price_by_status",
+          "current_status": "gifted",
+          "status_ws_value": 2600.0,
+          "status_ws_priced_bottles": 1,
+          "status_total_bottles": 1
+        },
+        {
+          "check_name": "ws_price_by_status",
+          "current_status": "in_stock",
+          "status_ws_value": 11200.0,
+          "status_ws_priced_bottles": 8,
+          "status_total_bottles": 8
+        }
+      ]
+    }
+  ]
+}

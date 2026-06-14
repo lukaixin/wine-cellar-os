@@ -28,6 +28,7 @@ export function AppLayout({
         </div>
         <nav>
           <button className={page === "dashboard" ? "active" : ""} onClick={() => setPage("dashboard")}>Dashboard</button>
+          <button className={page === "analytics" ? "active" : ""} onClick={() => setPage("analytics")}>Analytics</button>
           <button className={page === "collection" ? "active" : ""} onClick={() => setPage("collection")}>Collection Explorer</button>
           <button className={page === "bottles" ? "active" : ""} onClick={() => setPage("bottles")}>藏酒列表</button>
           <button className={page === "add" ? "active" : ""} onClick={() => setPage("add")}>新增入库</button>

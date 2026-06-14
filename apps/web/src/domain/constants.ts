@@ -1,5 +1,6 @@
 export type Page =
   | "dashboard"
+  | "analytics"
   | "bottles"
   | "collection"
   | "detail"
@@ -51,6 +52,7 @@ export const drinkWindowStatusLabel: Record<string, string> = {
 export function pageTitle(page: Page): string {
   return {
     dashboard: "Dashboard",
+    analytics: "Analytics",
     bottles: "藏酒列表",
     collection: "Collection Explorer",
     detail: "酒瓶详情",

@@ -1,5 +1,6 @@
 import type {
   Bottle,
+  AnalyticsSummary,
   Cellar,
   CollectionBottleDetail,
   CollectionBottleTimelineEvent,
@@ -69,6 +70,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export const api = {
   health: () => request<{ status: string }>("/health"),
   dashboard: () => request<DashboardSummary>("/api/dashboard/summary"),
+  analytics: () => request<AnalyticsSummary>("/api/analytics/summary"),
   producers: () => request<Producer[]>("/api/producers"),
   createProducer: (body: Partial<Producer>) =>
     request<Producer>("/api/producers", { method: "POST", body: JSON.stringify(body) }),

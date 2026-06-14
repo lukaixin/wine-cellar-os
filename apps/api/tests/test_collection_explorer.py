@@ -102,6 +102,7 @@ def test_collection_bottle_detail_is_limited_to_collection_fields(client: TestCl
     assert body["location"]["cellar_name"] == "主柜"
     assert body["location"]["code"] == "A-01-01"
     assert body["acquisition_date"] == "2026-06-13"
+    assert body["ws_price"] is None
     assert "purchase_price" not in body
     assert "default_drink_from" not in body
 

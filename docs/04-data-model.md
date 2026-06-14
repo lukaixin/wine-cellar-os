@@ -205,6 +205,7 @@ purchase_price numeric nullable
 purchase_currency text default 'CNY'
 purchase_source text nullable
 purchase_channel text nullable
+ws_price numeric nullable       # WineList 导入的 Wine-Searcher 单瓶参考价，可为空
 condition text nullable       # excellent/good/label_damage/low_fill/etc
 current_status text not null  # in_stock/drunk/gifted/sold/damaged/lost/returned
 current_location_id uuid fk locations.id nullable

@@ -27,6 +27,7 @@ class Bottle(UuidPrimaryKeyMixin, TimestampMixin, Base):
     purchase_currency: Mapped[str] = mapped_column(String(10), default="CNY", nullable=False)
     purchase_source: Mapped[str | None] = mapped_column(Text)
     purchase_channel: Mapped[str | None] = mapped_column(Text)
+    ws_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     condition: Mapped[str | None] = mapped_column(String(80))
     current_status: Mapped[str] = mapped_column(String(30), nullable=False)
     current_location_id: Mapped[str | None] = mapped_column(ForeignKey("locations.id"), index=True)

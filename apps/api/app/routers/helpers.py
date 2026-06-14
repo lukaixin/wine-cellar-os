@@ -115,6 +115,7 @@ def bottle_to_read(bottle: Bottle) -> dict[str, Any]:
         "purchase_currency": bottle.purchase_currency,
         "purchase_source": bottle.purchase_source,
         "purchase_channel": bottle.purchase_channel,
+        "ws_price": bottle.ws_price,
         "condition": bottle.condition,
         "current_status": bottle.current_status,
         "current_location_id": bottle.current_location_id,

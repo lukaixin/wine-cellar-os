@@ -46,6 +46,7 @@ class InventoryService:
             purchase_currency=payload.purchase_currency,
             purchase_source=payload.purchase_source,
             purchase_channel=payload.purchase_channel,
+            ws_price=payload.ws_price,
             condition=payload.condition,
             current_status="in_stock",
             current_location_id=to_location.id,

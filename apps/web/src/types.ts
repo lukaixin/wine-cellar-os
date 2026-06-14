@@ -69,6 +69,7 @@ export type Bottle = {
   purchase_currency: string;
   purchase_source?: string | null;
   purchase_channel?: string | null;
+  ws_price?: string | null;
   condition?: string | null;
   current_status: string;
   current_location_id?: string | null;
@@ -129,6 +130,7 @@ export type CollectionBottleDetail = {
   bottle_size_ml: number;
   quantity: number;
   status: string;
+  ws_price?: string | null;
   acquisition_date?: string | null;
   vintage_id: string;
   vintage_year?: number | null;
@@ -311,6 +313,7 @@ export type WineListImportNormalizedRow = {
   purchase_currency: string;
   purchase_channel?: string | null;
   purchase_source: string;
+  ws_price?: string | null;
   cellar_name: string;
   location_code: string;
   location_label: string;
@@ -631,6 +634,61 @@ export type RegistryDiscovery = {
   recent_wines: RegistryDiscoveryItem[];
   recent_vintages: RegistryDiscoveryItem[];
   quality_risks: RegistryQualityRisk[];
+};
+
+export type AnalyticsDistributionItem = {
+  label: string;
+  count: number;
+};
+
+export type AnalyticsInventorySummary = {
+  total_bottles: number;
+  total_wines: number;
+  total_producers: number;
+  total_vintages: number;
+  total_ws_value?: string | null;
+  ws_priced_bottles: number;
+  country_distribution: AnalyticsDistributionItem[];
+  region_distribution: AnalyticsDistributionItem[];
+  vintage_distribution: AnalyticsDistributionItem[];
+  status_distribution: AnalyticsDistributionItem[];
+};
+
+export type AnalyticsConsumptionPeriod = {
+  key: "last_30_days" | "last_90_days" | "all_time";
+  label: string;
+  consumed_bottles: number;
+  gifted_bottles: number;
+  damaged_bottles: number;
+};
+
+export type AnalyticsMonthlyConsumption = {
+  month: string;
+  consumed_bottles: number;
+  gifted_bottles: number;
+  damaged_bottles: number;
+};
+
+export type AnalyticsActivityItem = {
+  event_type: "IMPORT" | "CONSUME" | "GIFT" | "MOVE" | "DAMAGE";
+  transaction_id: string;
+  bottle_id: string;
+  bottle_label?: string | null;
+  occurred_at: string;
+  actor?: string | null;
+  reason?: string | null;
+  note?: string | null;
+  from_location: CollectionLocation;
+  to_location: CollectionLocation;
+};
+
+export type AnalyticsSummary = {
+  inventory: AnalyticsInventorySummary;
+  consumption: {
+    periods: AnalyticsConsumptionPeriod[];
+    monthly_trend: AnalyticsMonthlyConsumption[];
+  };
+  activity: AnalyticsActivityItem[];
 };
 
 export type AppData = {

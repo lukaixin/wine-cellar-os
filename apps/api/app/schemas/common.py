@@ -217,6 +217,7 @@ class BottleCreate(BaseModel):
     purchase_currency: str = "CNY"
     purchase_source: str | None = None
     purchase_channel: str | None = None
+    ws_price: Decimal | None = None
     condition: str | None = None
     personal_rating: int | None = None
     personal_notes: str | None = None
@@ -232,6 +233,7 @@ class BottleUpdate(BaseModel):
     purchase_currency: str | None = None
     purchase_source: str | None = None
     purchase_channel: str | None = None
+    ws_price: Decimal | None = None
     condition: str | None = None
     personal_rating: int | None = None
     personal_notes: str | None = None
@@ -247,6 +249,7 @@ class BottleRead(OrmModel):
     purchase_currency: str
     purchase_source: str | None
     purchase_channel: str | None
+    ws_price: Decimal | None
     condition: str | None
     current_status: str
     current_location_id: str | None
@@ -310,6 +313,7 @@ class CollectionBottleDetail(BaseModel):
     bottle_size_ml: int
     quantity: int = 1
     status: str
+    ws_price: Decimal | None = None
     acquisition_date: date | None = None
     vintage_id: str
     vintage_year: int | None = None
@@ -441,6 +445,63 @@ class DashboardSummary(BaseModel):
     cellar_health_score: DashboardHealthScore
 
 
+class AnalyticsDistributionItem(BaseModel):
+    label: str
+    count: int
+
+
+class AnalyticsInventorySummary(BaseModel):
+    total_bottles: int
+    total_wines: int
+    total_producers: int
+    total_vintages: int
+    total_ws_value: Decimal | None = None
+    ws_priced_bottles: int
+    country_distribution: list[AnalyticsDistributionItem]
+    region_distribution: list[AnalyticsDistributionItem]
+    vintage_distribution: list[AnalyticsDistributionItem]
+    status_distribution: list[AnalyticsDistributionItem]
+
+
+class AnalyticsConsumptionPeriod(BaseModel):
+    key: Literal["last_30_days", "last_90_days", "all_time"]
+    label: str
+    consumed_bottles: int
+    gifted_bottles: int
+    damaged_bottles: int
+
+
+class AnalyticsMonthlyConsumption(BaseModel):
+    month: str
+    consumed_bottles: int
+    gifted_bottles: int
+    damaged_bottles: int
+
+
+class AnalyticsConsumptionSummary(BaseModel):
+    periods: list[AnalyticsConsumptionPeriod]
+    monthly_trend: list[AnalyticsMonthlyConsumption]
+
+
+class AnalyticsActivityItem(BaseModel):
+    event_type: Literal["IMPORT", "CONSUME", "GIFT", "MOVE", "DAMAGE"]
+    transaction_id: str
+    bottle_id: str
+    bottle_label: str | None = None
+    occurred_at: datetime
+    actor: str | None = None
+    reason: str | None = None
+    note: str | None = None
+    from_location: CollectionLocationRead
+    to_location: CollectionLocationRead
+
+
+class AnalyticsSummary(BaseModel):
+    inventory: AnalyticsInventorySummary
+    consumption: AnalyticsConsumptionSummary
+    activity: list[AnalyticsActivityItem]
+
+
 class CsvImportDraftRequest(BaseModel):
     csv_text: str = Field(min_length=1)
     filename: str | None = None
@@ -514,6 +575,7 @@ class WineListImportNormalizedRow(BaseModel):
     purchase_currency: str = "CNY"
     purchase_channel: str | None = None
     purchase_source: str
+    ws_price: Decimal | None = None
     cellar_name: str
     location_code: str
     location_label: str

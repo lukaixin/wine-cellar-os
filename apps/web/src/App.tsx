@@ -4,6 +4,7 @@ import { EmptyPanel } from "./components/ui/EmptyPanel";
 import type { Page } from "./domain/constants";
 import { useAppData } from "./hooks/useAppData";
 import { AddBottlePage } from "./pages/AddBottlePage";
+import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { BottleDetailPage } from "./pages/BottleDetailPage";
 import { BottlesPage } from "./pages/BottlesPage";
 import { CellarPage } from "./pages/CellarPage";
@@ -40,6 +41,7 @@ export default function App() {
       refresh={refresh}
     >
       {page === "dashboard" && <DashboardPage data={data} openBottle={openBottle} />}
+      {page === "analytics" && <AnalyticsPage />}
       {page === "collection" && <CollectionExplorerPage data={data} afterMutation={afterMutation} />}
       {page === "bottles" && <BottlesPage data={data} openBottle={openBottle} />}
       {page === "detail" && selectedBottle ? (

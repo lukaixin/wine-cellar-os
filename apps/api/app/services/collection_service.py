@@ -68,6 +68,7 @@ class CollectionService:
             "bottle_size_ml": bottle.bottle_size_ml,
             "quantity": 1,
             "status": bottle.current_status,
+            "ws_price": bottle.ws_price,
             "acquisition_date": bottle.acquisition_date,
             "vintage_id": bottle.vintage_id,
             "vintage_year": vintage.vintage_year if vintage else None,

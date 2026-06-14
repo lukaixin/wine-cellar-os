@@ -6,6 +6,10 @@
 
 Beta-1A 已完成主数据治理基础层：不新增 `WineRegistry` 根表，继续使用 `Producer -> Wine -> Vintage`，并新增 canonical key、wine identity key、alias registry、import mapping、review queue 和 quality findings。WineList draft 已输出匹配分和 decision；前端新增 Registry Quality 页面。当前 Beta 进度约 62%-65%，Vision 仍保持 35%。
 
+## 2026-06-14 Beta-5 Analytics Foundation + WS Price Import Extension 状态
+
+Beta-5 已完成基础分析层和 WineList `WS Price` 导入扩展：新增只读 Analytics API/UI，展示库存 summary、Country/Region/Vintage/Status 分布、Consumption periods、Monthly Trend 和 Recent Activity；Consumption 与 Activity 直接来自 `InventoryTransaction` ledger。Bottle 新增 nullable `ws_price` 字段，WineList Stock draft/confirm 支持 `WS Price`，Bottle Detail 和 Collection Bottle Detail 返回 `ws_price`，Analytics 展示 `total_ws_value = SUM(ws_price)`。本轮不包含 ROI、价格历史、估值模型、价格/消费预测、AI 推荐或治理审批。当前 Beta 进度约 92%-94%，Vision 仍保持 35%。
+
 ## 2026-06-13 Registry Search 状态
 
 Beta-2 已完成 Registry Search & Discovery：统一搜索服务支持 Producer/Wine/Vintage 分类结果，覆盖 canonical name、中文名、approved alias、旧 aliases、partial 和本地 fuzzy 匹配；新增只读详情 API 和 discovery API；前端新增 Registry Search 页面。当前 Beta 进度约 72%-75%，Vision 仍保持 35%。
@@ -58,6 +62,7 @@ Phase 3 中的“适饮期”已从字段展示推进到规则化洞察：后端
 | Beta-3A Collection Explorer MVP | 已完成库存查找层 | Collection search/detail API 和 Collection Explorer 页面已完成；不包含 analytics、price、drink window、recommendation 或 registry governance。 |
 | Beta-3B Bottle Detail & Timeline | 已完成单瓶链路 | Group 展开组内 Bottle、Bottle Detail Drawer tab 和 ledger timeline API/UI 已完成；不包含任何库存写操作。 |
 | Beta-4 Inventory Actions | 已完成库存操作层 | Bottle Detail Drawer Actions tab 和 Consume/Gift/Move/Damage action API 已完成；所有写操作 ledger-backed，不包含 analytics、估值、推荐或 registry governance。 |
+| Beta-5 Analytics Foundation | 已完成基础分析层 | Analytics API/UI、ledger-backed consumption/activity、WineList WS Price 导入和 Bottle `ws_price` 已完成；不包含 ROI、价格历史、预测、AI 或治理审批。 |
 | Phase 5 AI 辅助录入 | 壳子已完成 | 已有本地酒标上传、mock 草稿和人工确认入库；真实 AI/OCR 仍未开始，未来也只能生成草稿，不能直接改库存。 |
 | Phase 6 建议引擎 | 未开始 | 当前不做采购建议、推荐或预测。 |
 | Phase 7 推广准备 | 未开始 | 当前无云同步、账号权限、多用户或商业化设计。 |

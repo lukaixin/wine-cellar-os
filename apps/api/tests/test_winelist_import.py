@@ -1,8 +1,10 @@
 from collections.abc import Generator
+from io import BytesIO
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.database import create_app_engine, get_session
@@ -44,6 +46,26 @@ def draft_sample(client: TestClient):
                 )
             },
         )
+
+
+def draft_sample_with_ws_price(client: TestClient, price: str = "588.88"):
+    workbook = load_workbook(SAMPLE_WINELIST)
+    sheet = workbook["Stock"]
+    headers = [cell.value for cell in sheet[1]]
+    sheet.cell(row=2, column=headers.index("WS Price") + 1, value=price)
+    content = BytesIO()
+    workbook.save(content)
+    content.seek(0)
+    return client.post(
+        "/api/import/winelist/draft",
+        files={
+            "file": (
+                "WineList-with-ws-price.xlsx",
+                content.read(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
 
 
 def test_winelist_draft_validates_stock_without_mutating_inventory(client: TestClient) -> None:
@@ -98,6 +120,26 @@ def test_winelist_draft_validates_stock_without_mutating_inventory(client: TestC
     assert first_row["quantity"] >= 1
     assert first_row["created_bottle_ids"] == []
     assert first_row["ledger_transaction_ids"] == []
+
+
+def test_winelist_import_accepts_and_persists_ws_price(client: TestClient) -> None:
+    draft = draft_sample_with_ws_price(client)
+    assert draft.status_code == 200
+    body = draft.json()
+    assert body["rows"][0]["normalized"]["ws_price"] == "588.88"
+
+    confirm = client.post(f"/api/import/winelist/{body['batch_id']}/confirm")
+    assert confirm.status_code == 201
+
+    detail = client.get(f"/api/imports/batches/{body['batch_id']}")
+    imported_bottle_id = detail.json()["rows"][0]["created_bottle_ids"][0]
+    bottle = client.get(f"/api/bottles/{imported_bottle_id}")
+    assert bottle.status_code == 200
+    assert bottle.json()["ws_price"] == "588.88"
+
+    collection_detail = client.get(f"/collection/bottles/{imported_bottle_id}")
+    assert collection_detail.status_code == 200
+    assert collection_detail.json()["ws_price"] == "588.88"
 
 
 def test_winelist_confirm_expands_quantity_and_creates_in_ledger(client: TestClient) -> None:

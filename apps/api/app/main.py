@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.routers import (
+    analytics,
     bottles,
     cellars,
     collection,
@@ -61,6 +62,8 @@ app.include_router(collection.api_router)
 app.include_router(inventory_actions.router)
 app.include_router(inventory_actions.api_router)
 app.include_router(inventory_transactions.router)
+app.include_router(analytics.router)
+app.include_router(analytics.api_router)
 app.include_router(dashboard.router)
 app.include_router(exports.router)
 app.include_router(imports.router)

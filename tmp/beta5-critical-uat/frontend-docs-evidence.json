@@ -1,0 +1,33 @@
+{
+  "api_docs": {
+    "docs_status": "rendered",
+    "openapi_title": "Wine Cellar OS API",
+    "required_paths": [
+      "/api/analytics/summary",
+      "/analytics/summary",
+      "/collection/search",
+      "/api/collection/search",
+      "/collection/bottles/{bottle_id}",
+      "/collection/bottles/{bottle_id}/timeline",
+      "/inventory/actions/consume",
+      "/inventory/actions/gift",
+      "/inventory/actions/move",
+      "/inventory/actions/damage"
+    ],
+    "missing_paths": [],
+    "screenshot": "D:\\MyLife\\17_葡萄酒管理系统\\output\\playwright\\beta5-critical-uat-api-docs.png"
+  },
+  "frontend": {
+    "analytics_rendered": true,
+    "analytics_contains_ws_total": true,
+    "collection_rendered": true,
+    "collection_group_buttons": 11,
+    "bottle_detail_rendered": true,
+    "timeline_rendered": true,
+    "actions_rendered": true,
+    "screenshots": [
+      "D:\\MyLife\\17_葡萄酒管理系统\\output\\playwright\\beta5-critical-uat-analytics.png",
+      "D:\\MyLife\\17_葡萄酒管理系统\\output\\playwright\\beta5-critical-uat-collection.png"
+    ]
+  }
+}
