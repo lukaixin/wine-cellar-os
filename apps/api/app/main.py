@@ -21,6 +21,7 @@ from app.routers import (
     locations,
     producers,
     registry,
+    safety,
     vintages,
     winelist_import,
     wines,
@@ -71,6 +72,8 @@ app.include_router(import_batches.router)
 app.include_router(import_batches.api_router)
 app.include_router(registry.router)
 app.include_router(registry.api_router)
+app.include_router(safety.router)
+app.include_router(safety.api_router)
 app.include_router(winelist_import.router)
 app.include_router(label_intake.router)
 

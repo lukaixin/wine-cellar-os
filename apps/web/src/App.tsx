@@ -14,6 +14,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { LabelIntakePage } from "./pages/LabelIntakePage";
 import { RegistryQualityPage } from "./pages/RegistryQualityPage";
 import { RegistrySearchPage } from "./pages/RegistrySearchPage";
+import { SafetyPage } from "./pages/SafetyPage";
 import { TransactionsPage } from "./pages/TransactionsPage";
 
 export default function App() {
@@ -58,6 +59,7 @@ export default function App() {
       {page === "import" && <CsvImportPage afterMutation={afterMutation} openBottle={openBottle} />}
       {page === "registry-search" && <RegistrySearchPage />}
       {page === "registry" && <RegistryQualityPage />}
+      {page === "safety" && <SafetyPage afterMutation={afterMutation} />}
       {page === "label" && <LabelIntakePage data={data} afterMutation={afterMutation} openBottle={openBottle} />}
       {page === "cellar" && <CellarPage data={data} openBottle={openBottle} afterMutation={afterMutation} />}
       {page === "transactions" && <TransactionsPage data={data} afterMutation={afterMutation} />}

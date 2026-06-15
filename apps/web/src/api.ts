@@ -1,6 +1,8 @@
 import type {
   Bottle,
   AnalyticsSummary,
+  BackupCreateResponse,
+  BackupListResponse,
   Cellar,
   CollectionBottleDetail,
   CollectionBottleTimelineEvent,
@@ -13,6 +15,7 @@ import type {
   DamageBottleActionRequest,
   GiftBottleActionRequest,
   ImportBatchDetail,
+  ImportBatchCompensationResult,
   ImportBatchListResponse,
   ImportMapping,
   InventoryTransaction,
@@ -28,6 +31,7 @@ import type {
   RegistryQualityFinding,
   RegistryReviewQueueItem,
   RegistrySearchResponse,
+  RestoreResponse,
   Vintage,
   WineListImportConfirmResult,
   WineListImportDraft,
@@ -130,6 +134,15 @@ export const api = {
   importBatches: (limit = 50, offset = 0) =>
     request<ImportBatchListResponse>(`/imports/batches?limit=${limit}&offset=${offset}`),
   importBatch: (batchId: string) => request<ImportBatchDetail>(`/imports/batches/${batchId}`),
+  compensateImportBatch: (batchId: string, body: { reason: string; confirm_bottle_count: number }) =>
+    request<ImportBatchCompensationResult>(`/imports/batches/${batchId}/compensate`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  backups: () => request<BackupListResponse>("/api/admin/backups"),
+  createBackup: () => request<BackupCreateResponse>("/api/admin/backups", { method: "POST" }),
+  restoreBackup: (body: { filename: string; confirmation_text: string; reason: string }) =>
+    request<RestoreResponse>("/api/admin/backups/restore", { method: "POST", body: JSON.stringify(body) }),
   registryAliases: () => request<RegistryAlias[]>("/registry/aliases"),
   registryImportMappings: () => request<ImportMapping[]>("/registry/import-mappings"),
   registryReviewQueue: () => request<RegistryReviewQueueItem[]>("/registry/review-queue"),

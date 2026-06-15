@@ -27,6 +27,8 @@ export function CsvImportPage({
   const [wineListConfirming, setWineListConfirming] = useState(false);
   const [batchesLoading, setBatchesLoading] = useState(false);
   const [batchDetailLoading, setBatchDetailLoading] = useState(false);
+  const [compensating, setCompensating] = useState(false);
+  const [compensationReason, setCompensationReason] = useState("");
 
   useEffect(() => {
     void refreshImportBatches();
@@ -159,6 +161,39 @@ export function CsvImportPage({
     }
   }
 
+  async function compensateSelectedBatch() {
+    if (!selectedBatch) return;
+    if (!selectedBatch.can_compensate) {
+      setError("当前批次不能补偿。");
+      return;
+    }
+    if (!compensationReason.trim()) {
+      setError("请填写补偿原因。");
+      return;
+    }
+    if (!window.confirm(`Compensate ${selectedBatch.created_bottle_count} bottles from ${selectedBatch.filename}?`)) {
+      return;
+    }
+    setError(null);
+    setWarning(null);
+    setCompensating(true);
+    try {
+      const result = await api.compensateImportBatch(selectedBatch.id, {
+        reason: compensationReason,
+        confirm_bottle_count: selectedBatch.created_bottle_count,
+      });
+      setWarning(`已补偿 ${result.compensated_bottles} 瓶，生成 ${result.compensation_transaction_ids.length} 条 ADJUST ledger。`);
+      setCompensationReason("");
+      await afterMutation(`Import batch 已补偿 ${result.compensated_bottles} 瓶`);
+      await refreshImportBatches();
+      await openBatchDetail(selectedBatch.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "导入补偿失败");
+    } finally {
+      setCompensating(false);
+    }
+  }
+
   const canConfirm = Boolean(draft && draft.valid_rows > 0 && draft.invalid_rows === 0);
   const canConfirmWineList = Boolean(wineListDraft && wineListDraft.valid_rows > 0 && wineListDraft.invalid_rows === 0);
   const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleString("zh-CN") : "-");
@@ -259,20 +294,22 @@ export function CsvImportPage({
           </button>
         </div>
         <DataTable
-          headers={["文件", "状态", "创建时间", "确认时间", "行数", "成功行", "Warning 行", "Error 行", "创建瓶数", "操作"]}
+          headers={["文件", "状态", "创建时间", "确认时间", "补偿时间", "行数", "成功行", "Warning 行", "Error 行", "创建瓶数", "补偿瓶数", "操作"]}
           empty="暂无导入批次。"
           rows={importBatches.map((batch) => ({
             key: batch.id,
             cells: [
               batch.filename,
-              batch.status,
+              batch.compensated_at ? "compensated" : batch.status,
               formatDate(batch.created_at),
               formatDate(batch.confirmed_at),
+              formatDate(batch.compensated_at),
               batch.total_rows,
               batch.success_rows,
               batch.warning_rows,
               batch.error_rows,
               batch.created_bottle_count,
+              batch.compensated_bottle_count,
               <button
                 className="secondary compact-button"
                 type="button"
@@ -301,6 +338,7 @@ export function CsvImportPage({
             <Metric label="Warning 行" value={selectedBatch.warning_rows} />
             <Metric label="Error 行" value={selectedBatch.error_rows} />
             <Metric label="创建瓶数" value={selectedBatch.created_bottle_count} />
+            <Metric label="补偿瓶数" value={selectedBatch.compensated_bottle_count} />
           </div>
           <div className="info-grid">
             <div className="info-item">
@@ -319,8 +357,51 @@ export function CsvImportPage({
               <span>确认时间</span>
               <strong>{formatDate(selectedBatch.confirmed_at)}</strong>
             </div>
+            <div className="info-item">
+              <span>补偿时间</span>
+              <strong>{formatDate(selectedBatch.compensated_at)}</strong>
+            </div>
+            <div className="info-item">
+              <span>补偿 Ledger</span>
+              <strong>{selectedBatch.compensation_transaction_ids.length}</strong>
+            </div>
           </div>
           {selectedBatch.warnings.length > 0 && <div className="banner warning">{selectedBatch.warnings.join("; ")}</div>}
+          {selectedBatch.compensation_reason && <div className="banner success">补偿原因：{selectedBatch.compensation_reason}</div>}
+          <section className="sub-panel stack">
+            <div className="section-heading">
+              <div>
+                <h3>Import Compensation</h3>
+                <span className="subtle">使用 ADJUST ledger 补偿误导入影响，不删除历史。</span>
+              </div>
+              <span className="status-pill">{selectedBatch.can_compensate ? "可补偿" : "不可补偿"}</span>
+            </div>
+            <div className="metric-grid">
+              <Metric label="影响瓶数" value={selectedBatch.created_bottle_count} />
+              <Metric label="原始 IN Ledger" value={selectedBatch.rows.reduce((sum, row) => sum + row.ledger_transaction_ids.length, 0)} />
+              <Metric label="补偿 Ledger" value={selectedBatch.compensation_transaction_ids.length} />
+            </div>
+            {selectedBatch.compensation_blockers.length > 0 && (
+              <div className="banner warning">{selectedBatch.compensation_blockers.join("; ")}</div>
+            )}
+            <label>
+              <span>补偿原因</span>
+              <textarea
+                value={compensationReason}
+                disabled={!selectedBatch.can_compensate || compensating}
+                onChange={(event) => setCompensationReason(event.target.value)}
+              />
+            </label>
+            <div className="form-actions">
+              <button
+                type="button"
+                disabled={!selectedBatch.can_compensate || compensating || !compensationReason.trim()}
+                onClick={compensateSelectedBatch}
+              >
+                {compensating ? "补偿中" : "Compensate"}
+              </button>
+            </div>
+          </section>
           <DataTable
             className="review-table"
             headers={["行", "解析结果", "数量", "Raw values", "Warnings", "Errors", "Bottle IDs", "Transaction IDs"]}

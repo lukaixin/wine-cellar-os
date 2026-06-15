@@ -10,7 +10,13 @@ from sqlalchemy.orm import Session
 from app.core.database import get_session
 from app.models import ImportBatch, ImportBatchRow
 from app.routers.helpers import get_or_404
-from app.schemas.common import ImportBatchDetailResponse, ImportBatchListResponse
+from app.schemas.common import (
+    ImportBatchCompensationRequest,
+    ImportBatchCompensationResponse,
+    ImportBatchDetailResponse,
+    ImportBatchListResponse,
+)
+from app.services.import_compensation_service import ImportCompensationService, row_list
 
 router = APIRouter(prefix="/imports", tags=["import_batches"])
 api_router = APIRouter(prefix="/api/imports", tags=["import_batches"])
@@ -24,19 +30,15 @@ class BatchStats:
     created_bottle_count: int
 
 
-def _row_list(value: Any) -> list[Any]:
-    return value if isinstance(value, list) else []
-
-
 def _batch_stats(rows: list[ImportBatchRow]) -> BatchStats:
     success_rows = sum(1 for row in rows if row.status == "imported")
     if success_rows == 0:
         success_rows = sum(1 for row in rows if row.status == "valid")
     return BatchStats(
         success_rows=success_rows,
-        warning_rows=sum(1 for row in rows if _row_list(row.warnings)),
-        error_rows=sum(1 for row in rows if row.status == "invalid" or _row_list(row.errors)),
-        created_bottle_count=sum(len(_row_list(row.created_bottle_ids)) for row in rows),
+        warning_rows=sum(1 for row in rows if row_list(row.warnings)),
+        error_rows=sum(1 for row in rows if row.status == "invalid" or row_list(row.errors)),
+        created_bottle_count=sum(len(row_list(row.created_bottle_ids)) for row in rows),
     )
 
 
@@ -48,11 +50,13 @@ def _batch_to_list_item(batch: ImportBatch, rows: list[ImportBatchRow]) -> dict[
         "status": batch.status,
         "created_at": batch.created_at,
         "confirmed_at": batch.confirmed_at,
+        "compensated_at": batch.compensated_at,
         "total_rows": batch.row_count,
         "success_rows": stats.success_rows,
         "warning_rows": stats.warning_rows,
         "error_rows": stats.error_rows,
         "created_bottle_count": stats.created_bottle_count,
+        "compensated_bottle_count": len(row_list(batch.compensation_transaction_ids)),
     }
 
 
@@ -65,10 +69,10 @@ def _row_to_detail(row: ImportBatchRow) -> dict[str, Any]:
         "parsed_wine": normalized.get("wine_name"),
         "parsed_vintage": normalized.get("vintage_year"),
         "quantity": normalized.get("quantity"),
-        "warnings": _row_list(row.warnings),
-        "errors": _row_list(row.errors),
-        "created_bottle_ids": _row_list(row.created_bottle_ids),
-        "ledger_transaction_ids": _row_list(row.created_transaction_ids),
+        "warnings": row_list(row.warnings),
+        "errors": row_list(row.errors),
+        "created_bottle_ids": row_list(row.created_bottle_ids),
+        "ledger_transaction_ids": row_list(row.created_transaction_ids),
     }
 
 
@@ -110,6 +114,7 @@ def _get_import_batch_detail(batch_id: str, session: Session = Depends(get_sessi
         .order_by(ImportBatchRow.source_row_number.asc())
     ).all()
     stats = _batch_stats(rows)
+    plan = ImportCompensationService(session).plan(batch, rows)
     return {
         "id": batch.id,
         "filename": batch.source_filename,
@@ -118,17 +123,34 @@ def _get_import_batch_detail(batch_id: str, session: Session = Depends(get_sessi
         "status": batch.status,
         "created_at": batch.created_at,
         "confirmed_at": batch.confirmed_at,
+        "compensated_at": batch.compensated_at,
+        "compensation_reason": batch.compensation_reason,
+        "compensation_transaction_ids": row_list(batch.compensation_transaction_ids),
+        "can_compensate": plan.can_compensate,
+        "compensation_blockers": plan.blockers,
         "total_rows": batch.row_count,
         "success_rows": stats.success_rows,
         "warning_rows": stats.warning_rows,
         "error_rows": stats.error_rows,
         "created_bottle_count": stats.created_bottle_count,
-        "warnings": _row_list(batch.warnings),
+        "compensated_bottle_count": len(row_list(batch.compensation_transaction_ids)),
+        "warnings": row_list(batch.warnings),
         "rows": [_row_to_detail(row) for row in rows],
     }
 
 
+def _compensate_import_batch(
+    batch_id: str,
+    payload: ImportBatchCompensationRequest,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    batch = get_or_404(session, ImportBatch, batch_id, "Import batch")
+    return ImportCompensationService(session).compensate(batch, payload)
+
+
 router.get("/batches", response_model=ImportBatchListResponse)(_list_import_batches)
 router.get("/batches/{batch_id}", response_model=ImportBatchDetailResponse)(_get_import_batch_detail)
+router.post("/batches/{batch_id}/compensate", response_model=ImportBatchCompensationResponse)(_compensate_import_batch)
 api_router.get("/batches", response_model=ImportBatchListResponse)(_list_import_batches)
 api_router.get("/batches/{batch_id}", response_model=ImportBatchDetailResponse)(_get_import_batch_detail)
+api_router.post("/batches/{batch_id}/compensate", response_model=ImportBatchCompensationResponse)(_compensate_import_batch)

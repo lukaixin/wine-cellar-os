@@ -29,6 +29,9 @@ class ImportBatch(UuidPrimaryKeyMixin, CreatedAtMixin, Base):
     bottle_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     warnings: Mapped[list[str] | dict[str, Any]] = mapped_column(JSON, default=list, nullable=False)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    compensated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    compensation_reason: Mapped[str | None] = mapped_column(Text)
+    compensation_transaction_ids: Mapped[list[str] | dict[str, Any]] = mapped_column(JSON, default=list, nullable=False)
 
     rows: Mapped[list["ImportBatchRow"]] = relationship("ImportBatchRow", back_populates="batch")
 

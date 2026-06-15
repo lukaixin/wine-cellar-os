@@ -68,7 +68,7 @@ class InventoryService:
             self.session.refresh(transaction)
         return BottleCreationResult(bottle=bottle, transaction=transaction)
 
-    def apply_transaction(self, payload: InventoryTransactionCreate) -> InventoryTransaction:
+    def apply_transaction(self, payload: InventoryTransactionCreate, commit: bool = True) -> InventoryTransaction:
         transaction_type = payload.transaction_type.upper()
         if transaction_type not in SUPPORTED_TRANSACTION_TYPES:
             raise HTTPException(
@@ -103,8 +103,9 @@ class InventoryService:
             note=payload.note,
             occurred_at=payload.occurred_at,
         )
-        self.session.commit()
-        self.session.refresh(transaction)
+        if commit:
+            self.session.commit()
+            self.session.refresh(transaction)
         return transaction
 
     def _validate_transaction(

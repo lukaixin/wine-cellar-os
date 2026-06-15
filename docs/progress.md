@@ -2,6 +2,24 @@
 
 最后更新：2026-06-14
 
+## 2026-06-14 更新：Beta-6 Safety Foundation
+
+- Beta-6 Safety Foundation 已完成 Import Compensation 与 Backup & Restore 两项安全能力；本轮不开发 Governance、AI、Valuation，也不修改 Analytics 计算逻辑。
+- WineList Import Batch 新增 ledger-safe compensation workflow：已确认批次可按批次生成 `ADJUST` 补偿交易，原始 `IN` ledger、import rows 和 batch 审计历史均保留。
+- Import Batch Detail API/UI 新增 `can_compensate`、`compensation_blockers`、`compensated_at`、`compensation_reason`、`compensation_transaction_ids` 与补偿确认入口。
+- Backup & Restore 新增 Safety Admin 页面和 `/api/admin/backups` API：支持创建带时间戳的 SQLite 备份、列出备份、校验后恢复，并记录 safety event。
+- 新增 `safety_events` 表和非破坏性 Alembic migration `20260614_0005_beta6_safety_foundation.py`；迁移只新增 nullable 字段和新表，不改写库存 ledger。
+- 新增文档 `docs/25-import-compensation.md` 与 `docs/26-backup-restore.md`，记录补偿规则、备份恢复规则、迁移策略、API、UI 和测试边界。
+
+## 2026-06-14 更新：Beta-5 RC1 Release Freeze
+
+- Beta-5 已完成 RC1 Release Freeze。冻结范围包括 Release Readiness Review、Release Notes、Demo Dataset、Roadmap Update 和 Progress Update；本轮没有开发新业务功能。
+- 新增 `docs/releases/beta5-rc1-review.md`，记录当前系统能力、Completed Domains、Stable/Experimental Features、Known Risks、Outstanding Gaps、RC1 Assessment 和 Recommended Beta-6 Scope。
+- 新增 `docs/releases/beta5-rc1.md`，作为 Beta-5 RC1 Release Notes，记录 Release Date、Version、Features、Database Version、Test Results、Upgrade Notes、Known Limitations 和 Next Milestone。
+- 新增官方演示数据资产：`demo-winelist.xlsx`、`demo.db`、`docs/demo-dataset.md`。演示库为合成数据，不包含真实个人库存或客户数据。
+- Demo Dataset 已通过生成后校验：`demo.db` Alembic version 为 `20260614_0004`，包含 60 bottles、82 ledger transactions、60 个 WS priced bottles，SQL 与 Analytics WS total 均为 `55650.00`，orphan transaction rows 为 `0`，snapshot mismatch 为 `0`。
+- Beta-5 RC1 当前可作为本地单用户 Release Candidate、演示基线、UAT 基线和 Beta-6 计划输入；仍不能包装为 V1、生产云系统、真实 AI/OCR、实时估值或推荐系统。
+
 ## 2026-06-13 更新：Beta-1A Registry Foundation
 
 - 不新增 `WineRegistry` 根表，继续基于 `Producer -> Wine -> Vintage` 增强主数据治理。
@@ -99,7 +117,7 @@
 
 ## 当前项目状态
 
-当前处于本地 Alpha Demo + Beta analytics foundation 阶段。后端已具备 FastAPI + SQLite + SQLAlchemy 基础模型、Alembic migration、CRUD API、库存 transaction workflow、Dashboard、Analytics Summary、CSV 导出、安全 CSV 导入草稿、WineList Stock 真实库存导入和批量事务确认工作流、Registry Foundation 观察表、质量发现、统一 registry search/detail/discovery API、Collection search/detail/timeline API、Inventory Actions API，以及本地酒标图片 intake 草稿工作流。前端已具备 React + Vite Alpha UI，覆盖 Dashboard、Analytics、藏酒列表、Collection Explorer、Bottle Detail Drawer Actions/Timeline、手动入库、酒标入库、酒柜地图、Transaction 历史、CSV 导出、CSV 导入草稿、WineList Excel 导入 dry-run/确认、Registry Quality 和 Registry Search 页面。
+当前处于 Beta-6 Safety Foundation 阶段。后端已具备 FastAPI + SQLite + SQLAlchemy 基础模型、Alembic migration、CRUD API、库存 transaction workflow、Dashboard、Analytics Summary、CSV 导出、安全 CSV 导入草稿、WineList Stock 真实库存导入和批量事务确认工作流、WineList import compensation、Registry Foundation 观察表、质量发现、统一 registry search/detail/discovery API、Collection search/detail/timeline API、Inventory Actions API、Backup & Restore API，以及本地酒标图片 intake 草稿工作流。前端已具备 React + Vite Alpha UI，覆盖 Dashboard、Analytics、藏酒列表、Collection Explorer、Bottle Detail Drawer Actions/Timeline、手动入库、酒标入库、酒柜地图、Transaction 历史、CSV 导出、CSV 导入草稿、WineList Excel 导入 dry-run/确认/补偿、Registry Quality、Registry Search 和 Safety Admin 页面。
 
 项目仍保持本地单用户、无云同步、无账号权限、无真实 AI/OCR、无价格爬虫、无推荐引擎。当前酒标草稿使用本地 mock filename heuristic，只用于流程演示和字段预填。
 
@@ -126,6 +144,8 @@
 19. 2026-06-14：实现 Beta-3B Bottle Detail & Timeline，新增 collection bottle timeline API、组内 Bottle 展开、Detail/Timeline tab、API/UI 测试和 `docs/21-bottle-detail-timeline.md`。
 20. 2026-06-14：实现 Beta-4 Inventory Actions，新增 ledger-backed Consume/Gift/Move/Damage action API、Bottle Detail Drawer Actions tab、API/UI 测试和 `docs/22-inventory-actions.md`。
 21. 2026-06-14：实现 Beta-5 Analytics Foundation + WS Price Import Extension，新增 Analytics API/UI、`Bottle.ws_price`、WineList WS Price 导入、API/UI 测试和 `docs/23-analytics-foundation.md`、`docs/24-ws-price-extension.md`。
+22. 2026-06-14：完成 Beta-5 RC1 Release Freeze，新增 `docs/releases/beta5-rc1-review.md`、`docs/releases/beta5-rc1.md`、`docs/demo-dataset.md`、`demo-winelist.xlsx` 和 `demo.db`。
+23. 2026-06-14：实现 Beta-6 Safety Foundation，新增 WineList import compensation、Safety Admin Backup & Restore、`safety_events`、migration `20260614_0005`、API/UI/回归测试和 `docs/25-import-compensation.md`、`docs/26-backup-restore.md`。
 
 ## 本次变更涉及的主要模块
 
@@ -145,6 +165,11 @@
 - `apps/api/app/models/import_batch.py`：新增 import batch 和 import row 审计模型。
 - `apps/api/app/routers/winelist_import.py`：新增 WineList draft/confirm API。
 - `apps/api/app/routers/import_batches.py`：新增导入批次只读 list/detail API。
+- `apps/api/app/services/import_compensation_service.py`：新增 WineList batch compensation 计划和执行服务，使用 `ADJUST` ledger 补偿而不删除原始 `IN` transaction。
+- `apps/api/app/services/safety_service.py`：新增 SQLite backup/list/restore 服务，包含 quick_check、Alembic version 校验、pre-restore backup 和 safety event 记录。
+- `apps/api/app/routers/safety.py`：新增 `/admin/backups` 与 `/api/admin/backups` 备份恢复 API。
+- `apps/api/app/models/safety_event.py`：新增本地安全事件模型，用于记录备份和恢复。
+- `apps/api/migrations/versions/20260614_0005_beta6_safety_foundation.py`：新增 import batch compensation 字段和 `safety_events` 表。
 - `apps/api/migrations/versions/20260613_0002_import_batches.py`：新增导入审计表 migration。
 - `apps/api/migrations/versions/20260613_0003_registry_foundation.py`：新增 registry foundation migration，回填 Producer/Wine key。
 - `apps/api/migrations/versions/20260614_0004_bottle_ws_price.py`：新增 Bottle WS Price nullable 字段。
@@ -163,6 +188,8 @@
 - `apps/web/src/pages/CollectionExplorerPage.tsx`：新增 group 展开、组内 Bottle 选择和 Detail/Timeline tab 展示。
 - `apps/web/src/pages/CollectionExplorerPage.tsx`：新增 Bottle Detail Drawer Actions tab，提交 action 后刷新 detail、timeline、collection search 和全局数据。
 - `apps/web/src/pages/AnalyticsPage.tsx`：新增只读 Analytics 页面。
+- `apps/web/src/pages/SafetyPage.tsx`：新增 Safety Admin 页面，支持创建备份、查看备份和恢复确认。
+- `apps/web/src/pages/CsvImportPage.tsx`：新增 Import Batch compensation 信息、blockers 和补偿确认入口。
 - `docs/17-real-inventory-import.md`：新增真实库存导入规则、字段映射、位置映射和限制。
 - `docs/18-registry-foundation.md`：新增 registry foundation schema、API、migration 和限制说明。
 - `docs/19-registry-search.md`：新增 registry search/discovery 设计、API、排序和限制说明。
@@ -171,14 +198,24 @@
 - `docs/22-inventory-actions.md`：新增 Inventory Actions API、校验规则、Timeline 集成和非目标说明。
 - `docs/23-analytics-foundation.md`：新增 Analytics Foundation API、数据来源、UI 和限制说明。
 - `docs/24-ws-price-extension.md`：新增 WS Price 存储决策、导入行为、API 展示和迁移策略说明。
+- `docs/25-import-compensation.md`：新增 Import Compensation 规则、API、UI、迁移和非目标说明。
+- `docs/26-backup-restore.md`：新增 Backup & Restore 规则、API、UI、校验和操作边界说明。
+- `docs/releases/beta5-rc1-review.md`：新增 Beta-5 RC1 release readiness review，作为冻结评审记录。
+- `docs/releases/beta5-rc1.md`：新增 Beta-5 RC1 release notes。
+- `docs/demo-dataset.md`：新增官方演示数据集说明、验证结果和推荐 demo 路径。
+- `demo-winelist.xlsx`：新增合成 WineList Stock 演示 workbook。
+- `demo.db`：新增合成 SQLite 演示数据库，版本为 `20260614_0004`。
 
 ## 最新验证结果
 
-- `python -m pytest -q`，工作目录 `apps/api`：通过，`67 passed in 30.64s`。
+- `python -m pytest -q`，工作目录 `apps/api`：通过，`71 passed in 37.55s`。
 - `npm.cmd run build`，工作目录 `apps/web`：通过，Vite `8.0.16` production build 成功。
 - `npm.cmd run test:ui`，工作目录 `apps/web`：通过，`1 passed` / `2 passed`。
+- `python -m pytest tests\test_winelist_import.py tests\test_safety_service.py tests\test_migrations.py -q`，工作目录 `apps/api`：通过，`11 passed in 15.61s`。
 - `npm.cmd run qa:alpha`，工作目录 `apps/web`：通过，`failures: []`，包含 `importedBottles: 1`、`total_bottles: 6`、`in_stock_bottles: 2`、`health_score: 79`。
 - 截图验证：生成 `output/playwright/beta5-analytics.png`，覆盖 Analytics Overview、Distribution、Consumption 和 WS Price Coverage。
+- Critical UAT：通过，Passed 14、Failed 0、Blocked 0；ledger mismatch 为 `0`，orphan transaction rows 为 `0`，WS Price database total 与 API/Analytics total 一致。
+- Beta-5 RC1 Demo Dataset：`demo.db` 生成并校验通过，`alembic_version=20260614_0004`，`bottle_count=60`，`transaction_counts=IN 60 / MOVE 6 / CONSUME 8 / GIFT 5 / DAMAGE 3`，`ws_total_sql=55650.00`，`ws_total_analytics=55650.00`。
 
 ## 已知限制
 
@@ -201,10 +238,10 @@
 
 ## 下一步建议任务
 
-1. 为 Registry Review Queue 增加人工处理状态、alias approve/reject 和 merge planning，但不要自动改写 Bottle/Ledger。
-2. 为 WineList 导入设计人工撤销/补偿流程，但保持 ledger 不可篡改，不做删除式 rollback。
-3. 为 Registry Search 增加高亮匹配片段、筛选质量状态和更明确的 alias provenance。
-4. 继续细拆 `CellarPage`、`AddBottlePage`、`LabelIntakePage` 内部表单组件，降低单页文件长度。
-5. 为酒标 intake 增加持久化 draft/reject 历史和 bottle detail 图片回看。
-6. 为 CSV 导入补充“下载模板 CSV”和“只显示无效行/有效行”的前端辅助操作。
-7. 增加数据库恢复演练文档和示例数据隔离检查。
+1. 为 WineList 和未来 CSV 导入设计 ledger-safe 人工撤销/补偿流程，但保持 ledger 不可篡改，不做删除式 rollback。
+2. 稳定 Registry Review Queue：人工处理状态、notes、alias approve/reject、merge planning，但不要自动改写 Bottle/Ledger。
+3. 为 Registry Search 增加匹配高亮、质量状态筛选、alias provenance 和 fuzzy 阈值校准。
+4. 稳定 CSV import：模板下载、导入预览筛选、标签落库、导入历史对齐。
+5. 补齐本地数据安全：数据库恢复演练、demo/sample/real data 隔离检查。
+6. 为酒标 intake 增加持久化 draft/reject 历史和 bottle detail 图片回看。
+7. 继续细拆 `CellarPage`、`AddBottlePage`、`LabelIntakePage` 内部表单组件，降低单页文件长度。

@@ -551,6 +551,11 @@ button.active-action {
   gap: 12px;
 }
 
+.sub-panel {
+  border-top: 1px solid #ece5d8;
+  padding-top: 14px;
+}
+
 .form-row {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: end;
@@ -623,6 +628,17 @@ img.label-preview {
 }
 
 .checkbox-field input {
+  min-height: 0;
+  width: auto;
+}
+
+.checkbox-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.checkbox-row input {
   min-height: 0;
   width: auto;
 }

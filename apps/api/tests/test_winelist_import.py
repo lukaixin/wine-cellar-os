@@ -184,6 +184,75 @@ def test_winelist_confirm_expands_quantity_and_creates_in_ledger(client: TestCli
     assert detail_body["confirmed_at"] is not None
     assert sum(len(row["created_bottle_ids"]) for row in detail_body["rows"]) == 119
     assert sum(len(row["ledger_transaction_ids"]) for row in detail_body["rows"]) == 119
+    assert detail_body["can_compensate"] is True
+    assert detail_body["compensation_blockers"] == []
+
+
+def test_import_batch_compensation_creates_adjust_ledger_without_deleting_history(client: TestClient) -> None:
+    draft = draft_sample(client)
+    assert draft.status_code == 200
+    batch_id = draft.json()["batch_id"]
+    confirm = client.post(f"/api/import/winelist/{batch_id}/confirm")
+    assert confirm.status_code == 201
+
+    response = client.post(
+        f"/api/imports/batches/{batch_id}/compensate",
+        json={"reason": "Wrong batch imported during UAT", "confirm_bottle_count": 119},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["batch_id"] == batch_id
+    assert body["compensated_bottles"] == 119
+    assert body["transaction_type"] == "ADJUST"
+    assert len(body["compensation_transaction_ids"]) == 119
+
+    bottles = client.get("/api/bottles").json()
+    transactions = client.get("/api/inventory-transactions").json()
+    assert len(bottles) == 119
+    assert len(transactions) == 238
+    assert {bottle["current_status"] for bottle in bottles} == {"lost"}
+    assert {bottle["current_location_id"] for bottle in bottles} == {None}
+    assert sum(1 for transaction in transactions if transaction["transaction_type"] == "IN") == 119
+    adjust_transactions = [transaction for transaction in transactions if transaction["transaction_type"] == "ADJUST"]
+    assert len(adjust_transactions) == 119
+    assert all("Compensated import batch" in (transaction["note"] or "") for transaction in adjust_transactions)
+
+    detail = client.get(f"/api/imports/batches/{batch_id}").json()
+    assert detail["compensated_at"] is not None
+    assert detail["compensation_reason"] == "Wrong batch imported during UAT"
+    assert detail["compensated_bottle_count"] == 119
+    assert detail["can_compensate"] is False
+    assert "Batch has already been compensated." in detail["compensation_blockers"]
+
+    duplicate = client.post(
+        f"/api/imports/batches/{batch_id}/compensate",
+        json={"reason": "Try again", "confirm_bottle_count": 119},
+    )
+    assert duplicate.status_code == 409
+
+
+def test_import_batch_compensation_rejects_batches_with_post_import_activity(client: TestClient) -> None:
+    draft = draft_sample(client)
+    assert draft.status_code == 200
+    batch_id = draft.json()["batch_id"]
+    confirm = client.post(f"/api/import/winelist/{batch_id}/confirm")
+    assert confirm.status_code == 201
+    first_bottle_id = confirm.json()["created_bottle_ids"][0]
+
+    consume = client.post("/inventory/actions/consume", json={"bottle_id": first_bottle_id, "quantity": 1})
+    assert consume.status_code == 201
+
+    response = client.post(
+        f"/imports/batches/{batch_id}/compensate",
+        json={"reason": "Wrong batch imported during UAT", "confirm_bottle_count": 119},
+    )
+
+    assert response.status_code == 409
+    assert any("post-import ledger activity" in item for item in response.json()["detail"])
+    transactions = client.get("/api/inventory-transactions").json()
+    assert sum(1 for transaction in transactions if transaction["transaction_type"] == "ADJUST") == 0
+    assert sum(1 for transaction in transactions if transaction["transaction_type"] == "CONSUME") == 1
 
 
 def test_winelist_draft_rejects_rows_already_confirmed(client: TestClient) -> None:

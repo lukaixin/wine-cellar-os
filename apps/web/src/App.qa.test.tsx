@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import type { ImportBatchDetail } from "./types";
 
 type Entity = Record<string, any>;
 
@@ -19,6 +20,7 @@ function makeServer() {
     transactions: [] as Entity[],
     uploads: [] as Entity[],
   };
+  const backups: Entity[] = [];
 
   function json(body: unknown, status = 200) {
     return new Response(JSON.stringify(body), {
@@ -215,7 +217,7 @@ function makeServer() {
     );
   }
 
-  const importBatchDetail = {
+  const importBatchDetail: ImportBatchDetail = {
     id: "batch-1",
     filename: "WineList.xlsx",
     sheet_name: "Stock",
@@ -223,11 +225,17 @@ function makeServer() {
     status: "confirmed",
     created_at: new Date(2026, 5, 13, 9, 0).toISOString(),
     confirmed_at: new Date(2026, 5, 13, 9, 5).toISOString(),
+    compensated_at: null,
+    compensation_reason: null,
+    compensation_transaction_ids: [],
+    can_compensate: true,
+    compensation_blockers: [],
     total_rows: 114,
     success_rows: 114,
     warning_rows: 1,
     error_rows: 1,
     created_bottle_count: 119,
+    compensated_bottle_count: 0,
     warnings: ["Region normalized from Sorthern Rhone to Southern Rhone"],
     rows: [
       {
@@ -613,16 +621,64 @@ function makeServer() {
             status: importBatchDetail.status,
             created_at: importBatchDetail.created_at,
             confirmed_at: importBatchDetail.confirmed_at,
+            compensated_at: importBatchDetail.compensated_at,
             total_rows: importBatchDetail.total_rows,
             success_rows: importBatchDetail.success_rows,
             warning_rows: importBatchDetail.warning_rows,
             error_rows: importBatchDetail.error_rows,
             created_bottle_count: importBatchDetail.created_bottle_count,
+            compensated_bottle_count: importBatchDetail.compensated_bottle_count,
           },
         ],
       });
     }
     if (method === "GET" && url.pathname === "/imports/batches/batch-1") return json(importBatchDetail);
+    if (method === "POST" && url.pathname === "/imports/batches/batch-1/compensate") {
+      importBatchDetail.compensated_at = new Date(2026, 5, 13, 10, 0).toISOString();
+      importBatchDetail.compensation_reason = body.reason;
+      importBatchDetail.compensation_transaction_ids = ["txn-comp-1", "txn-comp-2"];
+      importBatchDetail.can_compensate = false;
+      importBatchDetail.compensation_blockers = ["Batch has already been compensated."];
+      importBatchDetail.compensated_bottle_count = body.confirm_bottle_count;
+      return json({
+        batch_id: "batch-1",
+        compensated_bottles: body.confirm_bottle_count,
+        compensation_transaction_ids: importBatchDetail.compensation_transaction_ids,
+        compensated_at: importBatchDetail.compensated_at,
+        transaction_type: "ADJUST",
+        status: "compensated",
+      });
+    }
+    if (method === "GET" && url.pathname === "/api/admin/backups") {
+      return json({
+        database_path: "D:/demo/wine_cellar.db",
+        backup_dir: "D:/demo/backups",
+        backups,
+      });
+    }
+    if (method === "POST" && url.pathname === "/api/admin/backups") {
+      const backup = {
+        filename: `wine_cellar-${backups.length + 1}.db.bak`,
+        path: `D:/demo/backups/wine_cellar-${backups.length + 1}.db.bak`,
+        size_bytes: 4096,
+        sha256: `${backups.length + 1}`.repeat(64).slice(0, 64),
+        created_at: new Date(2026, 5, 13, 10, backups.length).toISOString(),
+        event_id: `safety-event-${backups.length + 1}`,
+      };
+      backups.unshift(backup);
+      return json(backup, 201);
+    }
+    if (method === "POST" && url.pathname === "/api/admin/backups/restore") {
+      if (body.confirmation_text !== "RESTORE") return json({ detail: "confirmation_text must be RESTORE" }, 422);
+      return json({
+        restored_from: `D:/demo/backups/${body.filename}`,
+        restored_to: "D:/demo/wine_cellar.db",
+        restored_sha256: "r".repeat(64),
+        pre_restore_backup: "D:/demo/backups/pre-restore.db.bak",
+        event_id: "restore-event-1",
+        restored_at: new Date(2026, 5, 13, 11, 0).toISOString(),
+      });
+    }
     if (method === "GET" && url.pathname === "/registry/quality/findings") return json(registryFindings);
     if (method === "GET" && url.pathname === "/registry/review-queue") return json(registryReviewQueue);
     if (method === "GET" && url.pathname === "/registry/aliases") return json(registryAliases);
@@ -977,6 +1033,11 @@ describe("Alpha UI smoke", () => {
     expect(screen.getByText("Vintage must be a year: bad")).toBeTruthy();
     expect(screen.getByText(/bottle-winelist-1/)).toBeTruthy();
     expect(screen.getByText(/txn-winelist-1/)).toBeTruthy();
+    expect(screen.getByText("Import Compensation")).toBeTruthy();
+    await user.type(screen.getByLabelText("补偿原因"), "导入了错误批次");
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    await user.click(screen.getByRole("button", { name: "Compensate" }));
+    await screen.findByText(/生成 2 条 ADJUST ledger/);
 
     await user.click(screen.getByRole("button", { name: "Registry Quality" }));
     await waitFor(() => expect(screen.getAllByText("Findings").length).toBeGreaterThan(0));
@@ -1001,6 +1062,19 @@ describe("Alpha UI smoke", () => {
     await screen.findByText("Wine Count");
     expect(screen.getByText("Bourgogne")).toBeTruthy();
     expect(screen.getAllByText("DRC").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "Safety Admin" }));
+    await screen.findByText("Backup & Restore");
+    await user.click(screen.getByRole("button", { name: "Create Backup" }));
+    await screen.findByText(/Backup created/);
+    await user.click(screen.getAllByRole("button", { name: "Restore" })[0]);
+    await screen.findByText("Restore Confirmation");
+    await user.type(screen.getByLabelText("恢复原因"), "QA restore");
+    await user.type(screen.getByLabelText("输入 RESTORE 以确认"), "RESTORE");
+    await user.click(screen.getByLabelText(/我确认恢复会替换当前数据库文件/));
+    const restoreButtons = screen.getAllByRole("button", { name: "Restore" });
+    await user.click(restoreButtons[restoreButtons.length - 1]);
+    await screen.findByText(/Restored from/);
 
     await user.click(screen.getByRole("button", { name: "库存导入" }));
 

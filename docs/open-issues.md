@@ -1,6 +1,20 @@
 # Open Issues
 
-最后更新：2026-06-13
+最后更新：2026-06-14
+
+## 2026-06-14 Beta-6 Safety Foundation 说明
+
+- WineList import batch compensation 已实现。当前可对未被后续库存动作触碰的 confirmed WineList batch 生成 `ADJUST` 补偿交易，原始 `IN` ledger 保留。
+- Safety Admin Backup & Restore 已实现。当前支持文件型 SQLite backup/list/restore、typed confirmation、pre-restore backup、SQLite quick check、Alembic version 校验和 safety event 记录。
+- 当前没有已确认的库存 ledger 破坏性 bug；新增补偿测试、备份恢复测试、迁移测试和 UI smoke 均已通过。
+- 剩余问题的处理顺序建议转入 Beta-6C：CSV import batch 化与补偿、demo dataset 生成脚本、备份保留策略、Registry governance 和真实数据隔离。
+
+## 2026-06-14 Beta-5 RC1 Freeze 说明
+
+- Beta-5 RC1 已完成 Release Freeze。当前没有已确认的库存 ledger 破坏性 bug；Critical UAT、Ledger Validation、WS Price Validation 和 Demo Dataset Validation 均通过。
+- 新增 release 资产：`docs/releases/beta5-rc1-review.md`、`docs/releases/beta5-rc1.md`、`docs/demo-dataset.md`、`demo-winelist.xlsx`、`demo.db`。
+- `demo.db` 是合成演示数据库，版本为 `20260614_0004`，包含 60 bottles、82 ledger transactions、60 个 WS priced bottles；不包含真实个人库存或客户数据。
+- 剩余问题的处理顺序建议转入 Beta-6：优先 import compensation、registry governance、CSV import hardening、backup/restore rehearsal 和 sample/demo/real data isolation。
 
 ## 2026-06-13 新增说明
 
@@ -28,7 +42,9 @@
 | P3 | 前端 `styles.css` 仍是单文件样式表。 | 样式增长后难以定位页面/组件归属。 | 后续按 layout、page、component 分段或拆分样式文件。 |
 | P2 | API 测试 fixture 在多个测试文件中重复。 | 测试维护成本上升。 | 提取到 `tests/conftest.py`。 |
 | P2 | CSV tags 只解析不落库。 | 用户可能以为标签已经保存。 | 接入 `tags/object_tags` 或在 UI 中更明确标注。 |
-| P2 | WineList import batch 已可查看详情，但没有撤销/补偿向导。 | 用户可以审计来源和创建结果，但不能按批次生成安全补偿动作。 | 撤销只能通过 ledger 补偿交易设计，不应删除原 transaction。 |
+| P2 | CSV import 尚未复用 import batch 历史和补偿向导。 | WineList batch 已可补偿，但 CSV 仍难以按批次追踪来源文件、导入行数和后续修正。 | 复用 WineList import batch 审计模式；撤销仍应通过 ledger 补偿交易而不是删除原始交易。 |
+| P2 | Demo dataset 生成流程尚未固化为脚本。 | `demo-winelist.xlsx` 和 `demo.db` 已生成并校验，但后续重新生成需要按文档步骤或重新执行 seed 流程。 | Beta-6C 可加入受控 demo seed 脚本；脚本仍必须走 ImportService 和 InventoryService。 |
+| P2 | Backup & Restore 还没有保留策略或定期提醒。 | 用户可以手动备份和恢复，但长期使用时仍可能忘记备份或保留过多敏感备份文件。 | Beta-6C 可增加备份演练 checklist、保留策略和敏感文件提示；不要默认上传云端。 |
 | P2 | Registry Review Queue 当前只读。 | 80-95 分匹配、alias 冲突和疑似重复可见，但不能在 UI 中处理状态。 | 后续增加人工处理状态和备注；不要让处理动作直接改写正式库存。 |
 | P2 | Alias Registry 尚无人工 approve/reject UI。 | `approved` alias 才能稳定匹配，但当前缺少用户确认入口。 | 增加 alias 管理页面或在 Registry Quality 中补操作；冲突 alias 必须先复核。 |
 | P2 | Registry Search 的 fuzzy/partial 阈值仍是本地启发式。 | 短查询、跨语言简称和相近酒名可能需要更多真实样本校准。 | 保持搜索结果显示 `matched_text/matched_by/score/quality_status`，后续用 WineList 样本和人工反馈调阈值。 |
@@ -42,8 +58,9 @@
 | 优先级 | 限制 | 影响 | 建议处理 |
 | --- | --- | --- | --- |
 | P1 | CSV 导入要求目标酒柜和位置已存在。 | 初次迁移数据前需要先建酒柜位置。 | 增加模板和预检查清单；是否自动创建位置需另行确认。 |
-| P2 | CSV 导入没有 import batch 历史和人工撤销流程。 | 用户难以按批次追踪来源文件、导入行数和后续修正。 | 可复用 WineList import batch 审计模式；撤销应通过 ledger 补偿交易而不是删除原始交易。 |
+| P2 | CSV 导入没有 import batch 历史和人工补偿流程。 | 用户难以按批次追踪来源文件、导入行数和后续修正。 | 可复用 WineList import batch 审计模式；补偿应通过 ledger 补偿交易而不是删除原始交易。 |
 | P2 | Excel 导入只支持 `WineList.xlsx` 的 `Stock` sheet。 | 其他 sheet、其他 Excel 模板和通用 xlsx 库存表仍不能直接导入。 | 后续先做模板化映射和人工字段匹配，不做自动推断或外部数据补全。 |
+| P2 | RC1 demo workbook 是 WineList-compatible synthetic sample，不是通用导入模板。 | 演示数据可用于 demo 和 UAT baseline，但不能代表用户任意 Excel 都可导入。 | 在 demo 和 release notes 中持续标注支持边界。 |
 | P2 | 酒标识别当前只是 mock filename heuristic。 | 只能作为流程演示，不能代表真实识别能力。 | 后续按 `docs/14-label-intake-ai-adapter.md` 接入本地 OCR/AI adapter。 |
 | P2 | 当前价格、适饮期、产区和类型都来自人工录入或 CSV 字段。 | 不代表权威数据。 | 保留来源、置信度和 manual 标记。 |
 | P3 | 没有拖拽式酒柜移动。 | 移动效率有限。 | 等 ledger 和位置规则稳定后再做拖拽。 |
@@ -58,4 +75,6 @@
 | P2 | Alias 被误当作合并依据。 | 保持 alias 与 merge 分离；只有 approved alias 可稳定匹配，conflict/candidate/observed 不应自动命中。 |
 | P2 | 搜索结果被误当作权威 registry 判定。 | 搜索只提供发现和核验入口；所有合并、审批、库存变更仍需独立人工确认流程。 |
 | P2 | 价格数据来源合规风险。 | 只做 manual/csv/screenshot/link note provider，不实现反爬或批量抓取。 |
+| P2 | Demo WS Price 被误解为真实估值或投资指标。 | 在 release notes、demo docs 和 UI 文案中保持 WS Price 为 synthetic/manual reference；正式估值应进入 future provider/snapshot scope。 |
+| P2 | 备份文件被误提交或长期散落在仓库目录。 | 备份文件包含完整本地库存、购买价格、送礼对象和估值字段，应视为敏感数据。 |
 | P3 | 前端 smoke 基于 jsdom，不能覆盖真实浏览器布局。 | 关键布局稳定后补 Playwright 或浏览器截图 QA。 |

@@ -1,6 +1,6 @@
 # 本地数据库迁移策略
 
-最后更新：2026-06-13
+最后更新：2026-06-14
 
 Wine Cellar OS Alpha 默认使用本地 SQLite。随着字段和表继续增加，不能再把“删除并重建数据库”作为常规升级方式；正式库存数据升级前必须先备份，再运行迁移。
 
@@ -21,6 +21,7 @@ Wine Cellar OS Alpha 默认使用本地 SQLite。随着字段和表继续增加�
 - `apps/api/migrations/versions/20260613_0002_import_batches.py`
 - `apps/api/migrations/versions/20260613_0003_registry_foundation.py`
 - `apps/api/migrations/versions/20260614_0004_bottle_ws_price.py`
+- `apps/api/migrations/versions/20260614_0005_beta6_safety_foundation.py`
 - `apps/api/scripts/backup_sqlite_db.py`
 
 ## 初始化或升级数据库
@@ -80,3 +81,4 @@ python -m alembic upgrade head
 - `import_batches/import_batch_rows` 只记录导入批次审计，不提供自动撤销；撤销应另行设计 ledger 补偿流程。
 - `20260613_0003_registry_foundation` 只新增 registry 治理字段和只读观察表，回填 Producer/Wine key，不迁移 Bottle 外键、不修改 ledger、不做自动合并。
 - `20260614_0004_bottle_ws_price` 只给 `bottles` 新增 nullable `ws_price` 字段，不修改 ledger、不回填价格、不创建估值历史。
+- `20260614_0005_beta6_safety_foundation` 只给 `import_batches` 新增 nullable compensation 字段，并新增 `safety_events` 表；不删除 import rows、不改写原始 `IN` ledger、不自动生成补偿交易。

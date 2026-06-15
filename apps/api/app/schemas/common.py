@@ -640,11 +640,13 @@ class ImportBatchListItem(BaseModel):
     status: str
     created_at: datetime
     confirmed_at: datetime | None = None
+    compensated_at: datetime | None = None
     total_rows: int
     success_rows: int
     warning_rows: int
     error_rows: int
     created_bottle_count: int
+    compensated_bottle_count: int = 0
 
 
 class ImportBatchListResponse(BaseModel):
@@ -675,13 +677,71 @@ class ImportBatchDetailResponse(BaseModel):
     status: str
     created_at: datetime
     confirmed_at: datetime | None = None
+    compensated_at: datetime | None = None
+    compensation_reason: str | None = None
+    compensation_transaction_ids: list[str] = Field(default_factory=list)
+    can_compensate: bool = False
+    compensation_blockers: list[str] = Field(default_factory=list)
     total_rows: int
     success_rows: int
     warning_rows: int
     error_rows: int
     created_bottle_count: int
+    compensated_bottle_count: int = 0
     warnings: list[str] = Field(default_factory=list)
     rows: list[ImportBatchDetailRow]
+
+
+class ImportBatchCompensationRequest(BaseModel):
+    reason: str = Field(min_length=1)
+    confirm_bottle_count: int = Field(ge=0)
+
+
+class ImportBatchCompensationResponse(BaseModel):
+    batch_id: str
+    compensated_bottles: int
+    compensation_transaction_ids: list[str]
+    compensated_at: datetime
+    transaction_type: Literal["ADJUST"] = "ADJUST"
+    status: Literal["compensated"] = "compensated"
+
+
+class BackupItem(BaseModel):
+    filename: str
+    path: str
+    size_bytes: int
+    sha256: str
+    created_at: datetime
+
+
+class BackupListResponse(BaseModel):
+    database_path: str
+    backup_dir: str
+    backups: list[BackupItem]
+
+
+class BackupCreateResponse(BaseModel):
+    filename: str
+    path: str
+    size_bytes: int
+    sha256: str
+    created_at: datetime
+    event_id: str
+
+
+class RestoreRequest(BaseModel):
+    filename: str
+    confirmation_text: str
+    reason: str = Field(min_length=1)
+
+
+class RestoreResponse(BaseModel):
+    restored_from: str
+    restored_to: str
+    restored_sha256: str
+    pre_restore_backup: str | None = None
+    event_id: str
+    restored_at: datetime
 
 
 class RegistryAliasRead(OrmModel):

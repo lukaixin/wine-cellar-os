@@ -44,16 +44,19 @@ def test_alembic_upgrade_creates_schema_from_empty_sqlite(tmp_path, monkeypatch)
         "import_mappings",
         "registry_review_queue",
         "registry_quality_findings",
+        "safety_events",
     }.issubset(tables)
 
     producer_columns = {column["name"] for column in inspect(engine).get_columns("producers")}
     wine_columns = {column["name"] for column in inspect(engine).get_columns("wines")}
     vintage_columns = {column["name"] for column in inspect(engine).get_columns("vintages")}
     bottle_columns = {column["name"] for column in inspect(engine).get_columns("bottles")}
+    import_batch_columns = {column["name"] for column in inspect(engine).get_columns("import_batches")}
     assert {"canonical_key", "quality_status", "merged_into_id", "reviewed_at"}.issubset(producer_columns)
     assert {"wine_identity_key", "quality_status", "merged_into_id", "reviewed_at"}.issubset(wine_columns)
     assert {"quality_status", "reviewed_at"}.issubset(vintage_columns)
     assert "ws_price" in bottle_columns
+    assert {"compensated_at", "compensation_reason", "compensation_transaction_ids"}.issubset(import_batch_columns)
 
 
 def test_alembic_upgrade_stamps_existing_alpha_sqlite_without_deleting_data(tmp_path, monkeypatch) -> None:
@@ -93,4 +96,4 @@ def test_alembic_upgrade_stamps_existing_alpha_sqlite_without_deleting_data(tmp_
     assert producer_count == 1
     assert canonical_key == "existing estate"
     assert quality_status == "unreviewed"
-    assert version == "20260614_0004"
+    assert version == "20260614_0005"

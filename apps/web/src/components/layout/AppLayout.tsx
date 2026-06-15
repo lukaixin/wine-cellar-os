@@ -35,6 +35,7 @@ export function AppLayout({
           <button className={page === "import" ? "active" : ""} onClick={() => setPage("import")}>库存导入</button>
           <button className={page === "registry-search" ? "active" : ""} onClick={() => setPage("registry-search")}>Registry Search</button>
           <button className={page === "registry" ? "active" : ""} onClick={() => setPage("registry")}>Registry Quality</button>
+          <button className={page === "safety" ? "active" : ""} onClick={() => setPage("safety")}>Safety Admin</button>
           <button className={page === "label" ? "active" : ""} onClick={() => setPage("label")}>酒标入库</button>
           <button className={page === "cellar" ? "active" : ""} onClick={() => setPage("cellar")}>酒柜地图</button>
           <button className={page === "transactions" ? "active" : ""} onClick={() => setPage("transactions")}>Transaction</button>

@@ -378,11 +378,13 @@ export type ImportBatchListItem = {
   status: string;
   created_at: string;
   confirmed_at?: string | null;
+  compensated_at?: string | null;
   total_rows: number;
   success_rows: number;
   warning_rows: number;
   error_rows: number;
   created_bottle_count: number;
+  compensated_bottle_count: number;
 };
 
 export type ImportBatchListResponse = {
@@ -413,13 +415,55 @@ export type ImportBatchDetail = {
   status: string;
   created_at: string;
   confirmed_at?: string | null;
+  compensated_at?: string | null;
+  compensation_reason?: string | null;
+  compensation_transaction_ids: string[];
+  can_compensate: boolean;
+  compensation_blockers: string[];
   total_rows: number;
   success_rows: number;
   warning_rows: number;
   error_rows: number;
   created_bottle_count: number;
+  compensated_bottle_count: number;
   warnings: string[];
   rows: ImportBatchDetailRow[];
+};
+
+export type ImportBatchCompensationResult = {
+  batch_id: string;
+  compensated_bottles: number;
+  compensation_transaction_ids: string[];
+  compensated_at: string;
+  transaction_type: "ADJUST";
+  status: "compensated";
+};
+
+export type BackupItem = {
+  filename: string;
+  path: string;
+  size_bytes: number;
+  sha256: string;
+  created_at: string;
+};
+
+export type BackupListResponse = {
+  database_path: string;
+  backup_dir: string;
+  backups: BackupItem[];
+};
+
+export type BackupCreateResponse = BackupItem & {
+  event_id: string;
+};
+
+export type RestoreResponse = {
+  restored_from: string;
+  restored_to: string;
+  restored_sha256: string;
+  pre_restore_backup?: string | null;
+  event_id: string;
+  restored_at: string;
 };
 
 export type LabelImageUpload = {

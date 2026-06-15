@@ -8,6 +8,7 @@ export type Page =
   | "import"
   | "registry-search"
   | "registry"
+  | "safety"
   | "label"
   | "cellar"
   | "transactions";
@@ -60,6 +61,7 @@ export function pageTitle(page: Page): string {
     import: "库存导入",
     "registry-search": "Registry Search",
     registry: "Registry Quality",
+    safety: "Safety Admin",
     label: "酒标入库",
     cellar: "酒柜地图",
     transactions: "Transaction",

@@ -8,6 +8,7 @@ from app.models.location import Location
 from app.models.media import MediaAsset
 from app.models.producer import Producer
 from app.models.registry import ImportMapping, RegistryAlias, RegistryQualityFinding, RegistryReviewQueue
+from app.models.safety_event import SafetyEvent
 from app.models.tag import ObjectTag, Tag
 from app.models.transaction import InventoryTransaction
 from app.models.valuation import ValuationSnapshot
@@ -31,6 +32,7 @@ __all__ = [
     "RegistryAlias",
     "RegistryQualityFinding",
     "RegistryReviewQueue",
+    "SafetyEvent",
     "Tag",
     "ValuationSnapshot",
     "Vintage",
